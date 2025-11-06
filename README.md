@@ -1,5 +1,8 @@
-Obs.: This is not fully functional yet, it's work in progress. Not sure if/when I will finish it.  
-While I use and create a few scripts, programming is just a hobby, I'm still a little lost on how to properly use vscode + github and I know very little of C#, so if you see something odd that's why. Basically most of the time I don't know what I'm doing. 
+## Introduction & Observations
+
+This is not fully functional yet, it's work in progress. Not sure if/when I will finish it.  
+
+While I use and create a few scripts, programming is just a hobby, I'm still a little lost on how to properly use vscode + github and I know very little of C#, so if you see something odd that's why, basically most of the time I don't know what I'm doing. 
 
 ## Objective
 
@@ -14,6 +17,9 @@ Jellyfin doesn't really give the admins many tools to change their servers Home 
 AFAIK the plugin Home Screen Sections replaces(?) the Home, and, as already mentioned and explained later, it also allow users to create their own sections, but that doesn't seems to be fully functional yet, in the sense that you can just enable an option and point to a file that initiates your custom section. 
 
 So I decided to create a small plugin that will hold my custom section to use with Home Screen Sections, no idea if it will work nor if there is a "better" solution.
+
+
+## About: Home Screen Sections (Jellyfin Plugin)
 
 Home Screen Sections need other 2 plugins to work (same author) and they all have github pages, so I will use:
 
