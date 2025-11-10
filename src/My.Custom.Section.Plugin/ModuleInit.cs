@@ -11,52 +11,52 @@ namespace My.Custom.Section.Plugin
         [ModuleInitializer]
         internal static void Init()
         {
-            string debugPath;
-            try
+            string TrySafePath(string p)
             {
-                var asmPath = Assembly.GetExecutingAssembly().Location;
-                var pluginDir = Path.GetDirectoryName(asmPath) ?? @"C:\Temp";
-                debugPath = Path.Combine(pluginDir, "jellyfin_plugin_debug.txt");
-            }
-            catch
-            {
-                debugPath = @"C:\Temp\jellyfin_plugin_debug.txt";
+                try { Directory.CreateDirectory(Path.GetDirectoryName(p) ?? p); File.AppendAllText(p, $"{DateTime.Now:O} [MyCustomSection] probe write{Environment.NewLine}"); return p; } catch { return null; }
             }
 
-            void TryWrite(string s)
-            {
-                try { Directory.CreateDirectory(Path.GetDirectoryName(debugPath) ?? @"C:\Temp"); File.AppendAllText(debugPath, s); } catch { }
-            }
+            string asmPath = null;
+            try { asmPath = Assembly.GetExecutingAssembly().Location; } catch { asmPath = null; }
 
-            TryWrite($"{DateTime.Now:O} [MyCustomSection] ModuleInitializer invoked (path={debugPath}){Environment.NewLine}");
-
-            try
+            var candidates = new[]
             {
-                var logType = Type.GetType("Serilog.Log, Serilog");
-                if (logType != null)
+                @"C:\Temp\jellyfin_plugin_debug.txt",
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),"jellyfin","jellyfin_plugin_debug.txt"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"jellyfin","jellyfin_plugin_debug.txt"),
+                asmPath != null ? Path.Combine(Path.GetDirectoryName(asmPath)??@"C:\Temp","jellyfin_plugin_debug.txt") : null,
+                Path.Combine(AppContext.BaseDirectory ?? @"C:\Temp","jellyfin_plugin_debug.txt")
+            };
+
+            foreach (var c in candidates)
+            {
+                if (string.IsNullOrEmpty(c)) continue;
+                var written = TrySafePath(c);
+                try
                 {
-                    var loggerProp = logType.GetProperty("Logger", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
-                    var logger = loggerProp?.GetValue(null);
-                    var mi = logger?.GetType().GetMethod("Information", new[] { typeof(string) });
-                    mi?.Invoke(logger, new object[] { $"[MyCustomSection] ModuleInitializer invoked (path={debugPath})" });
+                    if (written == null) File.AppendAllText(@"C:\Temp\jellyfin_module_fallback_log.txt", $"{DateTime.Now:O} Could not write to {c}{Environment.NewLine}");
                 }
+                catch { }
             }
-            catch { }
 
             try
             {
                 Task.Run(async () =>
                 {
-                    await Task.Delay(4000);
-                    TryWrite($"{DateTime.Now:O} [MyCustomSection] ModuleInit forcing RegisterSectionOnStartup{Environment.NewLine}");
+                    await Task.Delay(3000);
+                    try
+                    {
+                        File.AppendAllText(candidates[0] ?? @"C:\Temp\jellyfin_plugin_debug.txt", $"{DateTime.Now:O} [MyCustomSection] attempting forced registration; asmPath={asmPath}{Environment.NewLine}");
+                    }
+                    catch { }
                     try
                     {
                         new PluginBootstrap(null).RegisterSectionOnStartup();
-                        TryWrite($"{DateTime.Now:O} [MyCustomSection] ModuleInit RegisterSectionOnStartup complete{Environment.NewLine}");
+                        try { File.AppendAllText(candidates[0] ?? @"C:\Temp\jellyfin_plugin_debug.txt", $"{DateTime.Now:O} [MyCustomSection] RegisterSectionOnStartup OK{Environment.NewLine}"); } catch { }
                     }
                     catch (Exception ex)
                     {
-                        TryWrite($"{DateTime.Now:O} [MyCustomSection] ModuleInit exception: {ex}{Environment.NewLine}");
+                        try { File.AppendAllText(candidates[0] ?? @"C:\Temp\jellyfin_plugin_debug.txt", $"{DateTime.Now:O} [MyCustomSection] Register exception: {ex}{Environment.NewLine}"); } catch { }
                     }
                 });
             }
