@@ -1,5 +1,7 @@
 using System;
 using System.Runtime.CompilerServices;
+using System.Reflection;
+using System.IO;
 using System.Threading.Tasks;
 
 namespace My.Custom.Section.Plugin
@@ -9,12 +11,25 @@ namespace My.Custom.Section.Plugin
         [ModuleInitializer]
         internal static void Init()
         {
-            var debugPath = @"C:\Temp\jellyfin_plugin_debug.txt";
+            string debugPath;
+            try
+            {
+                var asmPath = Assembly.GetExecutingAssembly().Location;
+                var pluginDir = Path.GetDirectoryName(asmPath) ?? @"C:\Temp";
+                debugPath = Path.Combine(pluginDir, "jellyfin_plugin_debug.txt");
+            }
+            catch
+            {
+                debugPath = @"C:\Temp\jellyfin_plugin_debug.txt";
+            }
 
-            // Immediate trace to show module initializer ran
-            try { System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:O} [MyCustomSection] ModuleInitializer invoked{Environment.NewLine}"); } catch { }
+            void TryWrite(string s)
+            {
+                try { Directory.CreateDirectory(Path.GetDirectoryName(debugPath) ?? @"C:\Temp"); File.AppendAllText(debugPath, s); } catch { }
+            }
 
-            // Best-effort Serilog notice
+            TryWrite($"{DateTime.Now:O} [MyCustomSection] ModuleInitializer invoked (path={debugPath}){Environment.NewLine}");
+
             try
             {
                 var logType = Type.GetType("Serilog.Log, Serilog");
@@ -23,53 +38,25 @@ namespace My.Custom.Section.Plugin
                     var loggerProp = logType.GetProperty("Logger", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
                     var logger = loggerProp?.GetValue(null);
                     var mi = logger?.GetType().GetMethod("Information", new[] { typeof(string) });
-                    mi?.Invoke(logger, new object[] { "[MyCustomSection] ModuleInitializer invoked" });
+                    mi?.Invoke(logger, new object[] { $"[MyCustomSection] ModuleInitializer invoked (path={debugPath})" });
                 }
             }
             catch { }
 
-            // Schedule the registration after a short delay to avoid race conditions.
-            // This runs even if Jellyfin never instantiates PluginEntry.
             try
             {
                 Task.Run(async () =>
                 {
                     await Task.Delay(4000);
+                    TryWrite($"{DateTime.Now:O} [MyCustomSection] ModuleInit forcing RegisterSectionOnStartup{Environment.NewLine}");
                     try
                     {
-                        try { System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:O} [MyCustomSection] ModuleInit forcing RegisterSectionOnStartup{Environment.NewLine}"); } catch { }
-
                         new PluginBootstrap(null).RegisterSectionOnStartup();
-
-                        try { System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:O} [MyCustomSection] ModuleInit RegisterSectionOnStartup complete{Environment.NewLine}"); } catch { }
-                        try
-                        {
-                            var logType2 = Type.GetType("Serilog.Log, Serilog");
-                            if (logType2 != null)
-                            {
-                                var loggerProp2 = logType2.GetProperty("Logger", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
-                                var logger2 = loggerProp2?.GetValue(null);
-                                var mi2 = logger2?.GetType().GetMethod("Information", new[] { typeof(string) });
-                                mi2?.Invoke(logger2, new object[] { "[MyCustomSection] ModuleInit RegisterSectionOnStartup complete" });
-                            }
-                        }
-                        catch { }
+                        TryWrite($"{DateTime.Now:O} [MyCustomSection] ModuleInit RegisterSectionOnStartup complete{Environment.NewLine}");
                     }
                     catch (Exception ex)
                     {
-                        try { System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:O} [MyCustomSection] ModuleInit exception: {ex}{Environment.NewLine}"); } catch { }
-                        try
-                        {
-                            var logType3 = Type.GetType("Serilog.Log, Serilog");
-                            if (logType3 != null)
-                            {
-                                var loggerProp3 = logType3.GetProperty("Logger", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
-                                var logger3 = loggerProp3?.GetValue(null);
-                                var mi3 = logger3?.GetType().GetMethod("Error", new[] { typeof(string) });
-                                mi3?.Invoke(logger3, new object[] { $"[MyCustomSection] ModuleInit exception: {ex}" });
-                            }
-                        }
-                        catch { }
+                        TryWrite($"{DateTime.Now:O} [MyCustomSection] ModuleInit exception: {ex}{Environment.NewLine}");
                     }
                 });
             }
