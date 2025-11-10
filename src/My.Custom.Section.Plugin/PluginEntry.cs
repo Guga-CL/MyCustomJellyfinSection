@@ -37,6 +37,7 @@ namespace My.Custom.Section.Plugin
                         try { System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:O} [MyCustomSection] Calling RegisterSectionOnStartup{Environment.NewLine}"); } catch { }
 
                         var bootstrap = new PluginBootstrap(null);
+
                         bootstrap.RegisterSectionOnStartup();
 
                         try { System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:O} [MyCustomSection] RegisterSectionOnStartup complete{Environment.NewLine}"); } catch { }
@@ -72,7 +73,9 @@ namespace My.Custom.Section.Plugin
                     }
                 });
             }
-            catch { }
+            catch
+            {
+            }
         }
     }
 }
