@@ -3,16 +3,48 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Text.Json;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace My.Custom.Section.Plugin
 {
     public class PluginBootstrap
     {
-        private readonly object? _logger;
+        private readonly ILogger<PluginBootstrap>? _logger;
 
-        public PluginBootstrap(object? logger = null)
+        public PluginBootstrap(ILogger<PluginBootstrap>? logger = null)
         {
             _logger = logger;
+            // Run registration asynchronously so constructor returns fast and startup isn't blocked
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(1500); // small delay to avoid load-order races
+                    LogInfo("[MyCustomSection] Scheduled RegisterSectionOnStartup attempt starting");
+                    RegisterSectionOnStartup();
+                    LogInfo("[MyCustomSection] Scheduled RegisterSectionOnStartup attempt finished");
+                }
+                catch (Exception ex)
+                {
+                    LogError($"[MyCustomSection] Scheduled RegisterSectionOnStartup failed: {ex}");
+                }
+            });
+        }
+
+        private void TryWriteFile(string text)
+        {
+            try
+            {
+                // Write next to the deployed plugin DLL (always writable by the process that loaded the plugin)
+                var asm = Assembly.GetExecutingAssembly();
+                var dir = System.IO.Path.GetDirectoryName(asm.Location) ?? @"C:\Temp";
+                var path = System.IO.Path.Combine(dir, "jellyfin_plugin_debug.txt");
+                System.IO.File.AppendAllText(path, $"{DateTime.Now:O} {text}{Environment.NewLine}");
+            }
+            catch
+            {
+            }
         }
 
         private bool TryInvokeLogger(string methodName, params object[] args)
@@ -41,32 +73,46 @@ namespace My.Custom.Section.Plugin
             return false;
         }
 
-        private void LogDebug(string text) { if (!TryInvokeLogger("Debug", text)) Console.WriteLine(text); }
-        private void LogInfo(string text) { if (!TryInvokeLogger("Info", text)) Console.WriteLine(text); }
-        private void LogWarn(string text) { if (!TryInvokeLogger("Warn", text)) Console.WriteLine("WARN: " + text); }
-        private void LogError(string text) { if (!TryInvokeLogger("Error", text)) Console.WriteLine("ERROR: " + text); }
+        private void LogDebug(string text)
+        {
+            if (!TryInvokeLogger("LogDebug", text) && !TryInvokeLogger("Debug", text))
+            {
+                Console.WriteLine(text);
+            }
+            TryWriteFile($"DEBUG {text}");
+        }
+
+        private void LogInfo(string text)
+        {
+            if (!TryInvokeLogger("LogInformation", text) && !TryInvokeLogger("Information", text) && !TryInvokeLogger("Info", text))
+            {
+                Console.WriteLine(text);
+            }
+            TryWriteFile($"INFO {text}");
+        }
+
+        private void LogWarn(string text)
+        {
+            if (!TryInvokeLogger("LogWarning", text) && !TryInvokeLogger("Warn", text))
+            {
+                Console.WriteLine("WARN: " + text);
+            }
+            TryWriteFile($"WARN {text}");
+        }
+
+        private void LogError(string text)
+        {
+            if (!TryInvokeLogger("LogError", text) && !TryInvokeLogger("Error", text))
+            {
+                Console.WriteLine("ERROR: " + text);
+            }
+            TryWriteFile($"ERROR {text}");
+        }
 
         public void RegisterSectionOnStartup()
         {
-            var debugPath = @"C:\Temp\jellyfin_plugin_debug.txt";
-            try
-            {
-                try { System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:O} [MyCustomSection] Entering RegisterSectionOnStartup{Environment.NewLine}"); } catch { }
-                try
-                {
-                    var logType = Type.GetType("Serilog.Log, Serilog");
-                    if (logType != null)
-                    {
-                        var loggerProp = logType.GetProperty("Logger", BindingFlags.Static | BindingFlags.Public);
-                        var logger = loggerProp?.GetValue(null);
-                        var mi = logger?.GetType().GetMethod("Information", new[] { typeof(string) });
-                        mi?.Invoke(logger, new object[] { "[MyCustomSection] Entering RegisterSectionOnStartup" });
-                    }
-                }
-                catch { }
-            }
-            catch { }
-
+            var debugHeader = "[MyCustomSection] RegisterSectionOnStartup";
+            TryWriteFile($"{debugHeader} Entering");
             try
             {
                 LogInfo("PluginBootstrap: building payload for Home Screen Sections");
@@ -98,6 +144,7 @@ namespace My.Custom.Section.Plugin
                     LogDebug($"Loaded assembly: {name}");
                 }
 
+                // Find HomeScreenSections assembly
                 var homeScreenSectionsAssembly = AssemblyLoadContext
                     .All
                     .SelectMany(ctx => ctx.Assemblies)
@@ -137,39 +184,27 @@ namespace My.Custom.Section.Plugin
                     return;
                 }
 
+                // Try 1: JSON string
                 try
                 {
                     LogInfo("PluginBootstrap: attempting RegisterSection with JSON string payload.");
                     registerMethod.Invoke(null, new object?[] { payloadJson });
                     LogInfo("PluginBootstrap: RegisterSection invoked successfully with JSON string.");
-
-                    try { System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:O} [MyCustomSection] RegisterSection invoked with JSON{Environment.NewLine}"); } catch { }
-                    try
-                    {
-                        var logType = Type.GetType("Serilog.Log, Serilog");
-                        if (logType != null)
-                        {
-                            var loggerProp = logType.GetProperty("Logger", BindingFlags.Static | BindingFlags.Public);
-                            var logger = loggerProp?.GetValue(null);
-                            var mi = logger?.GetType().GetMethod("Information", new[] { typeof(string) });
-                            mi?.Invoke(logger, new object[] { "[MyCustomSection] RegisterSection invoked with JSON" });
-                        }
-                    }
-                    catch { }
-
+                    TryWriteFile($"{debugHeader} RegisterSection invoked with JSON");
                     return;
                 }
                 catch (TargetInvocationException tie)
                 {
                     LogWarn($"PluginBootstrap: RegisterSection with JSON string threw: {tie.InnerException?.ToString() ?? tie.ToString()}");
-                    try { System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:O} [MyCustomSection] JSON TargetInvocationException: {tie.InnerException}{Environment.NewLine}"); } catch { }
+                    TryWriteFile($"{debugHeader} JSON TargetInvocationException: {tie.InnerException}");
                 }
                 catch (Exception ex)
                 {
                     LogWarn($"PluginBootstrap: RegisterSection with JSON string failed: {ex}");
-                    try { System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:O} [MyCustomSection] JSON EX: {ex}{Environment.NewLine}"); } catch { }
+                    TryWriteFile($"{debugHeader} JSON EX: {ex}");
                 }
 
+                // Try 2: typed payload via reflection
                 try
                 {
                     LogInfo("PluginBootstrap: attempting to construct typed payload object via reflection.");
@@ -238,59 +273,33 @@ namespace My.Custom.Section.Plugin
                     LogInfo("PluginBootstrap: invoking RegisterSection with typed payload instance.");
                     registerMethod.Invoke(null, new object?[] { payloadInstance });
                     LogInfo("PluginBootstrap: RegisterSection invoked successfully with typed payload.");
-
-                    try { System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:O} [MyCustomSection] RegisterSection invoked with typed payload{Environment.NewLine}"); } catch { }
-                    try
-                    {
-                        var logType = Type.GetType("Serilog.Log, Serilog");
-                        if (logType != null)
-                        {
-                            var loggerProp = logType.GetProperty("Logger", BindingFlags.Static | BindingFlags.Public);
-                            var logger = loggerProp?.GetValue(null);
-                            var mi = logger?.GetType().GetMethod("Information", new[] { typeof(string) });
-                            mi?.Invoke(logger, new object[] { "[MyCustomSection] RegisterSection invoked with typed payload" });
-                        }
-                    }
-                    catch { }
-
+                    TryWriteFile($"{debugHeader} RegisterSection invoked with typed payload");
                     return;
                 }
                 catch (TargetInvocationException tie) when (tie.InnerException != null)
                 {
                     LogError($"PluginBootstrap: target invocation threw an exception during typed payload attempt: {tie.InnerException}");
-                    try { System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:O} [MyCustomSection] Typed payload TargetInvocationException: {tie.InnerException}{Environment.NewLine}"); } catch { }
+                    TryWriteFile($"{debugHeader} Typed payload TargetInvocationException: {tie.InnerException}");
                 }
                 catch (Exception ex)
                 {
                     LogError($"PluginBootstrap: unexpected error during typed payload attempt: {ex}");
-                    try { System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:O} [MyCustomSection] Typed payload EX: {ex}{Environment.NewLine}"); } catch { }
+                    TryWriteFile($"{debugHeader} Typed payload EX: {ex}");
                 }
             }
             catch (TargetInvocationException tie) when (tie.InnerException != null)
             {
-                LogError($"PluginBootstrap: target invocation threw an exception: {tie.InnerException}");
-                try { System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:O} [MyCustomSection] Outer TargetInvocationException: {tie.InnerException}{Environment.NewLine}"); } catch { }
+                LogError($"PluginBootstrap: outer target invocation threw an exception: {tie.InnerException}");
+                TryWriteFile($"{debugHeader} Outer TargetInvocationException: {tie.InnerException}");
             }
             catch (Exception ex)
             {
                 LogError($"PluginBootstrap: unexpected error during RegisterSectionOnStartup: {ex}");
-                try { System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:O} [MyCustomSection] Outer EX: {ex}{Environment.NewLine}"); } catch { }
+                TryWriteFile($"{debugHeader} Outer EX: {ex}");
             }
             finally
             {
-                try { System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:O} [MyCustomSection] Exiting RegisterSectionOnStartup{Environment.NewLine}"); } catch { }
-                try
-                {
-                    var logType = Type.GetType("Serilog.Log, Serilog");
-                    if (logType != null)
-                    {
-                        var loggerProp = logType.GetProperty("Logger", BindingFlags.Static | BindingFlags.Public);
-                        var logger = loggerProp?.GetValue(null);
-                        var mi = logger?.GetType().GetMethod("Information", new[] { typeof(string) });
-                        mi?.Invoke(logger, new object[] { "[MyCustomSection] Exiting RegisterSectionOnStartup" });
-                    }
-                }
-                catch { }
+                TryWriteFile($"{debugHeader} Exiting");
             }
         }
     }
