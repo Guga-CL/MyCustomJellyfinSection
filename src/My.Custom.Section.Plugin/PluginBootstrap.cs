@@ -1,306 +1,325 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.Loader;
-using System.Text.Json;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace My.Custom.Section.Plugin
 {
-    public class PluginBootstrap
+    public sealed class PluginBootstrap
     {
-        private readonly ILogger<PluginBootstrap>? _logger;
+        private readonly string _debugFileName = "jellyfin_plugin_debug.txt";
+        private readonly string _pluginId = "11111111-2222-3333-4444-555555555555";
+        private readonly string _displayText = "My Custom Section";
+        private readonly int _limit = 1;
+        private readonly string _route = "/my-custom-section";
+        private readonly string _resultsAssembly = "My.Custom.Section.Plugin, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null";
+        private readonly string _resultsClass = "My.Custom.Section.Plugin.ResultsHandler";
+        private readonly string _resultsMethod = "GetSectionResults";
 
-        public PluginBootstrap(ILogger<PluginBootstrap>? logger = null)
-        {
-            _logger = logger;
-            // Run registration asynchronously so constructor returns fast and startup isn't blocked
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    await Task.Delay(1500); // small delay to avoid load-order races
-                    LogInfo("[MyCustomSection] Scheduled RegisterSectionOnStartup attempt starting");
-                    RegisterSectionOnStartup();
-                    LogInfo("[MyCustomSection] Scheduled RegisterSectionOnStartup attempt finished");
-                }
-                catch (Exception ex)
-                {
-                    LogError($"[MyCustomSection] Scheduled RegisterSectionOnStartup failed: {ex}");
-                }
-            });
-        }
+        public PluginBootstrap(object? placeholder) { }
 
-        private void TryWriteFile(string text)
-        {
-            try
-            {
-                // Write next to the deployed plugin DLL (always writable by the process that loaded the plugin)
-                var asm = Assembly.GetExecutingAssembly();
-                var dir = System.IO.Path.GetDirectoryName(asm.Location) ?? @"C:\Temp";
-                var path = System.IO.Path.Combine(dir, "jellyfin_plugin_debug.txt");
-                System.IO.File.AppendAllText(path, $"{DateTime.Now:O} {text}{Environment.NewLine}");
-            }
-            catch
-            {
-            }
-        }
-
-        private bool TryInvokeLogger(string methodName, params object[] args)
-        {
-            if (_logger == null) return false;
-            try
-            {
-                var m = _logger.GetType().GetMethod(methodName, args.Select(a => a?.GetType() ?? typeof(object)).ToArray());
-                if (m != null)
-                {
-                    m.Invoke(_logger, args);
-                    return true;
-                }
-
-                var m2 = _logger.GetType().GetMethod(methodName, new[] { typeof(string) });
-                if (m2 != null)
-                {
-                    m2.Invoke(_logger, new object[] { string.Join(" ", args.Select(a => a?.ToString())) });
-                    return true;
-                }
-            }
-            catch
-            {
-            }
-
-            return false;
-        }
-
-        private void LogDebug(string text)
-        {
-            if (!TryInvokeLogger("LogDebug", text) && !TryInvokeLogger("Debug", text))
-            {
-                Console.WriteLine(text);
-            }
-            TryWriteFile($"DEBUG {text}");
-        }
-
-        private void LogInfo(string text)
-        {
-            if (!TryInvokeLogger("LogInformation", text) && !TryInvokeLogger("Information", text) && !TryInvokeLogger("Info", text))
-            {
-                Console.WriteLine(text);
-            }
-            TryWriteFile($"INFO {text}");
-        }
-
-        private void LogWarn(string text)
-        {
-            if (!TryInvokeLogger("LogWarning", text) && !TryInvokeLogger("Warn", text))
-            {
-                Console.WriteLine("WARN: " + text);
-            }
-            TryWriteFile($"WARN {text}");
-        }
-
-        private void LogError(string text)
-        {
-            if (!TryInvokeLogger("LogError", text) && !TryInvokeLogger("Error", text))
-            {
-                Console.WriteLine("ERROR: " + text);
-            }
-            TryWriteFile($"ERROR {text}");
-        }
-
+        // Public entry used by ServerEntry/BasePlugin
         public void RegisterSectionOnStartup()
         {
-            var debugHeader = "[MyCustomSection] RegisterSectionOnStartup";
-            TryWriteFile($"{debugHeader} Entering");
+            TryWrite("[MyCustomSection] RegisterSectionOnStartup Entering");
+
             try
             {
-                LogInfo("PluginBootstrap: building payload for Home Screen Sections");
+                var payloadJson = BuildPayloadJson();
+                TryWrite("INFO PluginBootstrap: building payload for Home Screen Sections");
+                TryWrite("INFO PluginBootstrap: payload => " + payloadJson);
 
-                var payload = new
+                // Find the HomeScreenSections plugin assembly / type/ method
+                var candidate = FindHomeScreenSectionsMethod();
+                if (candidate == null)
                 {
-                    id = "11111111-2222-3333-4444-555555555555",
-                    displayText = "My Custom Section",
-                    limit = 1,
-                    route = "/my-custom-section",
-                    additionalData = "{}",
-                    resultsAssembly = this.GetType().Assembly.FullName,
-                    resultsClass = $"{this.GetType().Namespace}.ResultsHandler",
-                    resultsMethod = "GetSectionResults"
-                };
-
-                string payloadJson = JsonSerializer.Serialize(payload);
-                LogInfo($"PluginBootstrap: payload => {payloadJson}");
-
-                var loaded = AssemblyLoadContext.All
-                    .SelectMany(ctx => ctx.Assemblies)
-                    .Select(a => a.FullName)
-                    .Where(n => !string.IsNullOrEmpty(n))
-                    .ToArray();
-
-                LogInfo($"PluginBootstrap: {loaded.Length} assemblies loaded. (first 10 shown)");
-                foreach (var name in loaded.Take(10))
-                {
-                    LogDebug($"Loaded assembly: {name}");
-                }
-
-                // Find HomeScreenSections assembly
-                var homeScreenSectionsAssembly = AssemblyLoadContext
-                    .All
-                    .SelectMany(ctx => ctx.Assemblies)
-                    .FirstOrDefault(a =>
-                        (a.FullName?.IndexOf(".HomeScreenSections", StringComparison.OrdinalIgnoreCase) ?? -1) >= 0
-                        || (a.FullName?.IndexOf("HomeScreenSections", StringComparison.OrdinalIgnoreCase) ?? -1) >= 0
-                        || (a.GetName().Name?.IndexOf("HomeScreenSections", StringComparison.OrdinalIgnoreCase) ?? -1) >= 0);
-
-                if (homeScreenSectionsAssembly == null)
-                {
-                    LogWarn("PluginBootstrap: HomeScreenSections assembly not found. Will retry with fallback search.");
-                    homeScreenSectionsAssembly = AssemblyLoadContext
-                        .All
-                        .SelectMany(ctx => ctx.Assemblies)
-                        .FirstOrDefault(a => a.GetType("Jellyfin.Plugin.HomeScreenSections.PluginInterface") != null);
-
-                    if (homeScreenSectionsAssembly == null)
-                    {
-                        LogWarn("PluginBootstrap: HomeScreenSections plugin interface assembly still not found. Aborting registration.");
-                        return;
-                    }
-                }
-
-                LogInfo($"PluginBootstrap: found candidate assembly: {homeScreenSectionsAssembly.FullName}");
-
-                var pluginInterfaceType = homeScreenSectionsAssembly.GetType("Jellyfin.Plugin.HomeScreenSections.PluginInterface");
-                if (pluginInterfaceType == null)
-                {
-                    LogWarn("PluginBootstrap: PluginInterface type not found on candidate assembly. Aborting registration.");
+                    TryWrite("WARN PluginBootstrap: HomeScreenSections Register method not found. Exiting.");
                     return;
                 }
 
-                var registerMethod = pluginInterfaceType.GetMethod("RegisterSection", BindingFlags.Public | BindingFlags.Static);
-                if (registerMethod == null)
-                {
-                    LogWarn("PluginBootstrap: RegisterSection method not found on PluginInterface. Aborting registration.");
-                    return;
-                }
+                var (pluginInstance, methodInfo) = candidate.Value;
 
-                // Try 1: JSON string
-                try
-                {
-                    LogInfo("PluginBootstrap: attempting RegisterSection with JSON string payload.");
-                    registerMethod.Invoke(null, new object?[] { payloadJson });
-                    LogInfo("PluginBootstrap: RegisterSection invoked successfully with JSON string.");
-                    TryWriteFile($"{debugHeader} RegisterSection invoked with JSON");
-                    return;
-                }
-                catch (TargetInvocationException tie)
-                {
-                    LogWarn($"PluginBootstrap: RegisterSection with JSON string threw: {tie.InnerException?.ToString() ?? tie.ToString()}");
-                    TryWriteFile($"{debugHeader} JSON TargetInvocationException: {tie.InnerException}");
-                }
-                catch (Exception ex)
-                {
-                    LogWarn($"PluginBootstrap: RegisterSection with JSON string failed: {ex}");
-                    TryWriteFile($"{debugHeader} JSON EX: {ex}");
-                }
+                // First attempt: invoke with JObject (if method expects JObject)
+                TryInvokeWithBestArgument(pluginInstance, methodInfo, payloadJson);
 
-                // Try 2: typed payload via reflection
-                try
-                {
-                    LogInfo("PluginBootstrap: attempting to construct typed payload object via reflection.");
-
-                    var candidateTypeNames = new[]
-                    {
-                        "Jellyfin.Plugin.HomeScreenSections.SectionPayload",
-                        "Jellyfin.Plugin.HomeScreenSections.Models.SectionPayload",
-                        "Jellyfin.Plugin.HomeScreenSections.Models.SectionRegistration",
-                        "Jellyfin.Plugin.HomeScreenSections.SectionRegistration"
-                    };
-
-                    Type? payloadType = null;
-                    foreach (var tn in candidateTypeNames)
-                    {
-                        payloadType = homeScreenSectionsAssembly.GetType(tn);
-                        if (payloadType != null) break;
-                    }
-
-                    if (payloadType == null)
-                    {
-                        payloadType = homeScreenSectionsAssembly.GetTypes()
-                            .FirstOrDefault(t =>
-                                t.GetProperty("Id", BindingFlags.Public | BindingFlags.Instance) != null
-                                && (t.GetProperty("DisplayText", BindingFlags.Public | BindingFlags.Instance) != null
-                                    || t.GetProperty("Title", BindingFlags.Public | BindingFlags.Instance) != null));
-                    }
-
-                    if (payloadType == null)
-                    {
-                        LogWarn("PluginBootstrap: Could not locate a payload DTO type in HomeScreenSections assembly. Aborting typed payload attempt.");
-                        return;
-                    }
-
-                    var payloadInstance = Activator.CreateInstance(payloadType);
-                    if (payloadInstance == null)
-                    {
-                        LogWarn("PluginBootstrap: Failed to create instance of payload DTO type.");
-                        return;
-                    }
-
-                    void SetIfExists(string propName, object? value)
-                    {
-                        var pi = payloadType.GetProperty(propName, BindingFlags.Public | BindingFlags.Instance);
-                        if (pi != null && pi.CanWrite)
-                        {
-                            try { pi.SetValue(payloadInstance, Convert.ChangeType(value, pi.PropertyType)); }
-                            catch
-                            {
-                                try { pi.SetValue(payloadInstance, value); } catch { }
-                            }
-                        }
-                    }
-
-                    SetIfExists("Id", payload.id);
-                    SetIfExists("Id", payload.id.ToString());
-                    SetIfExists("DisplayText", payload.displayText);
-                    SetIfExists("Title", payload.displayText);
-                    SetIfExists("Limit", payload.limit);
-                    SetIfExists("Route", payload.route);
-                    SetIfExists("AdditionalData", payload.additionalData);
-                    SetIfExists("ResultsAssembly", payload.resultsAssembly);
-                    SetIfExists("ResultsClass", payload.resultsClass);
-                    SetIfExists("ResultsMethod", payload.resultsMethod);
-
-                    LogInfo("PluginBootstrap: invoking RegisterSection with typed payload instance.");
-                    registerMethod.Invoke(null, new object?[] { payloadInstance });
-                    LogInfo("PluginBootstrap: RegisterSection invoked successfully with typed payload.");
-                    TryWriteFile($"{debugHeader} RegisterSection invoked with typed payload");
-                    return;
-                }
-                catch (TargetInvocationException tie) when (tie.InnerException != null)
-                {
-                    LogError($"PluginBootstrap: target invocation threw an exception during typed payload attempt: {tie.InnerException}");
-                    TryWriteFile($"{debugHeader} Typed payload TargetInvocationException: {tie.InnerException}");
-                }
-                catch (Exception ex)
-                {
-                    LogError($"PluginBootstrap: unexpected error during typed payload attempt: {ex}");
-                    TryWriteFile($"{debugHeader} Typed payload EX: {ex}");
-                }
-            }
-            catch (TargetInvocationException tie) when (tie.InnerException != null)
-            {
-                LogError($"PluginBootstrap: outer target invocation threw an exception: {tie.InnerException}");
-                TryWriteFile($"{debugHeader} Outer TargetInvocationException: {tie.InnerException}");
+                TryWrite("[MyCustomSection] RegisterSectionOnStartup Exiting");
             }
             catch (Exception ex)
             {
-                LogError($"PluginBootstrap: unexpected error during RegisterSectionOnStartup: {ex}");
-                TryWriteFile($"{debugHeader} Outer EX: {ex}");
+                TryWrite("[MyCustomSection] RegisterSectionOnStartup Exception: " + ex);
             }
-            finally
+        }
+
+        // Build the simple JSON string payload (kept identical shape used previously)
+        private string BuildPayloadJson()
+        {
+            var payload = new
             {
-                TryWriteFile($"{debugHeader} Exiting");
+                id = _pluginId,
+                displayText = _displayText,
+                limit = _limit,
+                route = _route,
+                additionalData = "{}",
+                resultsAssembly = _resultsAssembly,
+                resultsClass = _resultsClass,
+                resultsMethod = _resultsMethod
+            };
+
+            return JsonConvert.SerializeObject(payload);
+        }
+
+        // Try to find a Register method in Jellyfin.Plugin.HomeScreenSections or compatible assembly.
+        // Returns an instance (or null) and the MethodInfo to call.
+        private (object? instance, MethodInfo method)? FindHomeScreenSectionsMethod()
+        {
+            try
+            {
+                // Search loaded assemblies for a candidate assembly name and types that contain RegisterSection
+                var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+                var candidateAssemblies = assemblies
+                    .Where(a => a.GetName().Name?.IndexOf("HomeScreenSections", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                a.GetName().Name?.IndexOf("Jellyfin.Plugin.HomeScreenSections", StringComparison.OrdinalIgnoreCase) >= 0)
+                    .ToArray();
+
+                // Fallback: search assemblies by types that mention SectionRegisterPayload or RegisterSection method
+                if (candidateAssemblies.Length == 0)
+                {
+                    candidateAssemblies = assemblies
+                        .Where(a => a.GetTypes().Any(t =>
+                            t.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static)
+                             .Any(m => m.Name.IndexOf("Register", StringComparison.OrdinalIgnoreCase) >= 0)))
+                        .ToArray();
+                }
+
+                foreach (var asm in candidateAssemblies)
+                {
+                    try
+                    {
+                        var types = asm.GetTypes();
+                        foreach (var type in types)
+                        {
+                            // Find a public/static/instance method named "RegisterSection" or "Register"
+                            var method = type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance)
+                                             .FirstOrDefault(m => string.Equals(m.Name, "RegisterSection", StringComparison.OrdinalIgnoreCase) ||
+                                                                  string.Equals(m.Name, "Register", StringComparison.OrdinalIgnoreCase));
+                            if (method == null) continue;
+
+                            object? instance = null;
+                            if (!method.IsStatic)
+                            {
+                                try
+                                {
+                                    // Try to create an instance if there's a parameterless constructor
+                                    var ctor = type.GetConstructor(Type.EmptyTypes);
+                                    if (ctor != null) instance = ctor.Invoke(null);
+                                }
+                                catch { instance = null; }
+                            }
+
+                            TryWrite($"INFO PluginBootstrap: invoking RegisterSection candidate: {type.FullName}.{method.Name}");
+                            return (instance, method);
+                        }
+                    }
+                    catch (ReflectionTypeLoadException)
+                    {
+                        // ignore assemblies that cannot be reflected fully
+                    }
+                }
+
+                // If we fall through, no candidate found
+                return null;
             }
+            catch (Exception ex)
+            {
+                TryWrite("ERROR PluginBootstrap: FindHomeScreenSectionsMethod exception: " + ex);
+                return null;
+            }
+        }
+
+        // Central invocation helper: prepares the single argument value to match the method parameter
+        private void TryInvokeWithBestArgument(object? pluginInstance, MethodInfo method, string payloadJson)
+        {
+            try
+            {
+                var parameters = method.GetParameters();
+                if (parameters.Length == 0)
+                {
+                    // No parameters; just invoke
+                    method.Invoke(pluginInstance, null);
+                    TryWrite("INFO PluginBootstrap: invoked method without parameters.");
+                    return;
+                }
+
+                var paramType = parameters[0].ParameterType;
+
+                // If parameter expects JObject, provide JObject
+                if (paramType == typeof(JObject) || paramType.FullName == "Newtonsoft.Json.Linq.JObject")
+                {
+                    TryWrite("INFO PluginBootstrap: attempting RegisterSection with JObject payload.");
+                    var j = JObject.Parse(payloadJson);
+                    method.Invoke(pluginInstance, new object[] { j });
+                    TryWrite("INFO PluginBootstrap: JObject invocation succeeded.");
+                    return;
+                }
+
+                // If parameter is string
+                if (paramType == typeof(string))
+                {
+                    TryWrite("INFO PluginBootstrap: attempting RegisterSection with string payload.");
+                    method.Invoke(pluginInstance, new object[] { payloadJson });
+                    TryWrite("INFO PluginBootstrap: string invocation succeeded.");
+                    return;
+                }
+
+                // If parameter type is present in loaded assemblies, try to map to that typed object.
+                try
+                {
+                    var typedPayload = ConstructTypedPayload(paramType);
+                    if (typedPayload != null && paramType.IsAssignableFrom(typedPayload.GetType()))
+                    {
+                        TryWrite("INFO PluginBootstrap: attempting RegisterSection with typed payload instance.");
+                        method.Invoke(pluginInstance, new object[] { typedPayload });
+                        TryWrite("INFO PluginBootstrap: typed payload invocation succeeded.");
+                        return;
+                    }
+
+                    // Last resort: convert typed payload to JObject if param wants JObject-like value (covered earlier),
+                    // or try to convert from JObject to paramType via ToObject
+                    var jFromTyped = JObject.FromObject(typedPayload ?? new { });
+                    if (paramType.IsClass)
+                    {
+                        var converted = jFromTyped.ToObject(paramType);
+                        if (converted != null)
+                        {
+                            TryWrite("INFO PluginBootstrap: attempting RegisterSection after converting JObject->typed param.");
+                            method.Invoke(pluginInstance, new object[] { converted });
+                            TryWrite("INFO PluginBootstrap: converted invocation succeeded.");
+                            return;
+                        }
+                    }
+                }
+                catch (TargetInvocationException tie)
+                {
+                    // bubble to outer catch
+                    throw tie;
+                }
+
+                // If nothing worked, try invoking by passing JObject.ToString() (fallback)
+                TryWrite("WARN PluginBootstrap: no exact match for parameter type; attempting fallback with JSON string.");
+                method.Invoke(pluginInstance, new object[] { payloadJson });
+            }
+            catch (TargetInvocationException ex)
+            {
+                // Unwrap inner exception to log clearer reason
+                TryWrite("ERROR PluginBootstrap: invocation TargetInvocationException: " + ex.InnerException?.ToString() ?? ex.ToString());
+                throw;
+            }
+            catch (ArgumentException argEx)
+            {
+                TryWrite("WARN PluginBootstrap: RegisterSection argument type mismatch: " + argEx);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                TryWrite("ERROR PluginBootstrap: unexpected error during invocation: " + ex);
+                throw;
+            }
+        }
+
+        // Build an instance of the payload type when possible (very small, best-effort mapper)
+        private object? ConstructTypedPayload(Type targetType)
+        {
+            try
+            {
+                // Quick path: if targetType name contains SectionRegisterPayload, try to use its default ctor and set common props
+                if (targetType.Name.IndexOf("SectionRegisterPayload", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    var instance = Activator.CreateInstance(targetType);
+                    if (instance == null) return null;
+
+                    // Try to set common properties by name (best-effort)
+                    SetPropertyIfExists(targetType, instance, "Id", _pluginId);
+                    SetPropertyIfExists(targetType, instance, "DisplayText", _displayText);
+                    SetPropertyIfExists(targetType, instance, "Limit", _limit);
+                    SetPropertyIfExists(targetType, instance, "Route", _route);
+                    SetPropertyIfExists(targetType, instance, "AdditionalData", "{}");
+                    SetPropertyIfExists(targetType, instance, "ResultsAssembly", _resultsAssembly);
+                    SetPropertyIfExists(targetType, instance, "ResultsClass", _resultsClass);
+                    SetPropertyIfExists(targetType, instance, "ResultsMethod", _resultsMethod);
+
+                    return instance;
+                }
+
+                // If target type is a simple POCO in another assembly, try JObject.FromObject -> ToObject
+                var j = JObject.Parse(BuildPayloadJson());
+                var converted = j.ToObject(targetType);
+                return converted;
+            }
+            catch (Exception ex)
+            {
+                TryWrite("WARN PluginBootstrap: ConstructTypedPayload failed: " + ex);
+                return null;
+            }
+        }
+
+        private void SetPropertyIfExists(Type t, object instance, string propName, object value)
+        {
+            try
+            {
+                var p = t.GetProperty(propName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+                if (p != null && p.CanWrite)
+                {
+                    // Convert.ChangeType may throw for complex types; rely on JToken conversion if needed
+                    var converted = ConvertIfNeeded(value, p.PropertyType);
+                    p.SetValue(instance, converted);
+                }
+            }
+            catch { /* best-effort */ }
+        }
+
+        private object? ConvertIfNeeded(object value, Type targetType)
+        {
+            try
+            {
+                if (value == null) return null;
+                if (targetType.IsAssignableFrom(value.GetType())) return value;
+                if (targetType == typeof(string)) return value.ToString();
+                if (targetType.IsEnum && value is string s)
+                {
+                    return Enum.Parse(targetType, s);
+                }
+                return Convert.ChangeType(value, targetType);
+            }
+            catch
+            {
+                try
+                {
+                    // Fallback via JObject conversion
+                    var j = JToken.FromObject(value);
+                    return j.ToObject(targetType);
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+        }
+
+        // Debug/write helper: writes next to executing assembly if possible
+        private void TryWrite(string text)
+        {
+            try
+            {
+                var asmPath = Assembly.GetExecutingAssembly().Location;
+                var dir = Path.GetDirectoryName(asmPath) ?? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                var path = Path.Combine(dir, _debugFileName);
+                Directory.CreateDirectory(Path.GetDirectoryName(path) ?? dir);
+                File.AppendAllText(path, $"{DateTime.Now:O} {text}{Environment.NewLine}");
+            }
+            catch { }
         }
     }
 }
