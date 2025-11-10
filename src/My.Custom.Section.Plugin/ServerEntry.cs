@@ -1,30 +1,30 @@
 using System;
 using System.IO;
 using System.Reflection;
-using System.Threading;
 using System.Threading.Tasks;
-using Emby.Server.Implementations.Plugins; // NuGet/assembly symbol namespace used by Jellyfin
-using Microsoft.Extensions.Logging;
+using MediaBrowser.Common.Plugins;
 
 namespace My.Custom.Section.Plugin
 {
-    // Minimal implementation so Jellyfin constructs this type via its plugin loader.
-    public class ServerEntry : IServerEntryPoint
+    // Minimal plugin entry deriving from BasePlugin and implementing required members.
+    public class ServerEntry : BasePlugin
     {
-        private readonly ILogger<ServerEntry>? _logger;
+        // Provide a short plugin name shown in server UI
+        public override string Name => "My Custom Section";
 
-        // Parameterless ctor is fine; DI may inject logger if available.
-        public ServerEntry() { }
+        // Provide a short description shown in server UI
+        public override string Description => "Adds a custom section to Jellyfin UI";
 
-        // Called by Jellyfin on plugin enable/start
-        public void Run()
+        // Constructor schedules registration asynchronously to avoid blocking plugin load.
+        public ServerEntry()
         {
-            TryWrite("ServerEntry Run invoked");
+            TryWrite("ServerEntry(BasePlugin) ctor invoked");
+
             _ = Task.Run(async () =>
             {
                 try
                 {
-                    await Task.Delay(1200);
+                    await Task.Delay(800).ConfigureAwait(false);
                     TryWrite("ServerEntry scheduled RegisterSectionOnStartup start");
                     try
                     {
@@ -34,20 +34,14 @@ namespace My.Custom.Section.Plugin
                     }
                     catch (Exception ex)
                     {
-                        TryWrite("ServerEntry RegisterSectionOnStartup exception: " + ex);
+                        TryWrite("ServerEntry RegisterSectionOnStartup exception: " + ex.ToString());
                     }
                 }
                 catch (Exception ex)
                 {
-                    TryWrite("ServerEntry scheduling exception: " + ex);
+                    TryWrite("ServerEntry scheduling exception: " + ex.ToString());
                 }
             });
-        }
-
-        // Called by Jellyfin on shutdown; keep lightweight
-        public void Stop()
-        {
-            TryWrite("ServerEntry Stop invoked");
         }
 
         private void TryWrite(string text)
