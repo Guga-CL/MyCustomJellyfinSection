@@ -1,17 +1,16 @@
 using System;
 using System.Linq;
-using System.Runtime.Loader;
 using System.Reflection;
+using System.Runtime.Loader;
 using System.Text.Json;
-using MediaBrowser.Common.Logging;
 
 namespace My.Custom.Section.Plugin
 {
     public class PluginBootstrap
     {
-        private readonly ILogger _logger;
+        private readonly object? _logger;
 
-        public PluginBootstrap(ILogger logger)
+        public PluginBootstrap(object? logger = null)
         {
             _logger = logger;
         }
@@ -20,7 +19,7 @@ namespace My.Custom.Section.Plugin
         {
             try
             {
-                _logger.Info("PluginBootstrap: building payload for Home Screen Sections");
+                LogInfo("PluginBootstrap: building payload for Home Screen Sections");
 
                 var payload = new
                 {
@@ -35,22 +34,20 @@ namespace My.Custom.Section.Plugin
                 };
 
                 string payloadJson = JsonSerializer.Serialize(payload);
-                _logger.Info($"PluginBootstrap: payload => {payloadJson}");
+                LogInfo($"PluginBootstrap: payload => {payloadJson}");
 
-                // Diagnostic: list loaded assemblies so we can see what's available
                 var loaded = AssemblyLoadContext.All
                     .SelectMany(ctx => ctx.Assemblies)
                     .Select(a => a.FullName)
                     .Where(n => !string.IsNullOrEmpty(n))
                     .ToArray();
 
-                _logger.Info($"PluginBootstrap: {loaded.Length} assemblies loaded. (first 10 shown)");
+                LogInfo($"PluginBootstrap: {loaded.Length} assemblies loaded. (first 10 shown)");
                 foreach (var name in loaded.Take(10))
                 {
-                    _logger.Debug($"Loaded assembly: {name}");
+                    LogDebug($"Loaded assembly: {name}");
                 }
 
-                // Try to find the HomeScreenSections assembly with multiple patterns
                 var homeScreenSectionsAssembly = AssemblyLoadContext
                     .All
                     .SelectMany(ctx => ctx.Assemblies)
@@ -61,9 +58,8 @@ namespace My.Custom.Section.Plugin
 
                 if (homeScreenSectionsAssembly == null)
                 {
-                    _logger.Warn("PluginBootstrap: HomeScreenSections assembly not found. Will retry with broader scan and fallback.");
+                    LogWarn("PluginBootstrap: HomeScreenSections assembly not found. Will retry with broader scan and fallback.");
 
-                    // Fallback: try any assembly that exposes PluginInterface type
                     homeScreenSectionsAssembly = AssemblyLoadContext
                         .All
                         .SelectMany(ctx => ctx.Assemblies)
@@ -71,18 +67,18 @@ namespace My.Custom.Section.Plugin
 
                     if (homeScreenSectionsAssembly == null)
                     {
-                        _logger.Warn("PluginBootstrap: HomeScreenSections plugin interface assembly still not found. Aborting registration.");
+                        LogWarn("PluginBootstrap: HomeScreenSections plugin interface assembly still not found. Aborting registration.");
                         return;
                     }
                 }
 
-                _logger.Info($"PluginBootstrap: found candidate assembly: {homeScreenSectionsAssembly.FullName}");
+                LogInfo($"PluginBootstrap: found candidate assembly: {homeScreenSectionsAssembly.FullName}");
 
                 var pluginInterfaceType = homeScreenSectionsAssembly.GetType("Jellyfin.Plugin.HomeScreenSections.PluginInterface");
 
                 if (pluginInterfaceType == null)
                 {
-                    _logger.Warn("PluginBootstrap: PluginInterface type not found on candidate assembly. Aborting registration.");
+                    LogWarn("PluginBootstrap: PluginInterface type not found on candidate assembly. Aborting registration.");
                     return;
                 }
 
@@ -90,25 +86,75 @@ namespace My.Custom.Section.Plugin
 
                 if (registerMethod == null)
                 {
-                    _logger.Warn("PluginBootstrap: RegisterSection method not found on PluginInterface. Aborting registration.");
+                    LogWarn("PluginBootstrap: RegisterSection method not found on PluginInterface. Aborting registration.");
                     return;
                 }
 
-                // Convert payload JSON into a plain object compatible with the target method
                 var payloadObj = JsonSerializer.Deserialize<object>(payloadJson)!;
 
-                _logger.Info("PluginBootstrap: invoking RegisterSection on HomeScreenSections");
+                LogInfo("PluginBootstrap: invoking RegisterSection on HomeScreenSections");
                 registerMethod.Invoke(null, new object?[] { payloadObj });
-                _logger.Info("PluginBootstrap: RegisterSection invoked successfully");
+                LogInfo("PluginBootstrap: RegisterSection invoked successfully");
             }
             catch (TargetInvocationException tie) when (tie.InnerException != null)
             {
-                _logger.ErrorException("PluginBootstrap: target invocation threw an exception", tie.InnerException);
+                LogError($"PluginBootstrap: target invocation threw an exception: {tie.InnerException}");
             }
             catch (Exception ex)
             {
-                _logger.ErrorException("PluginBootstrap: unexpected error during RegisterSectionOnStartup", ex);
+                LogError($"PluginBootstrap: unexpected error during RegisterSectionOnStartup: {ex}");
             }
+        }
+
+        // TryInvokeLogger now returns true if it invoked something, false otherwise
+        private bool TryInvokeLogger(string methodName, params object[] args)
+        {
+            if (_logger == null) return false;
+
+            try
+            {
+                // Try exact parameter match
+                var m = _logger.GetType().GetMethod(methodName, args.Select(a => a?.GetType() ?? typeof(object)).ToArray());
+                if (m != null)
+                {
+                    m.Invoke(_logger, args);
+                    return true;
+                }
+
+                // Try a single string parameter overload
+                var m2 = _logger.GetType().GetMethod(methodName, new[] { typeof(string) });
+                if (m2 != null)
+                {
+                    m2.Invoke(_logger, new object[] { string.Join(" ", args.Select(a => a?.ToString())) });
+                    return true;
+                }
+            }
+            catch
+            {
+                // swallow logger problems
+            }
+
+            return false;
+        }
+
+        private void LogDebug(string text)
+        {
+            if (!TryInvokeLogger("Debug", text)) Console.WriteLine(text);
+        }
+
+        private void LogInfo(string text)
+        {
+            if (!TryInvokeLogger("Info", text)) Console.WriteLine(text);
+        }
+
+        private void LogWarn(string text)
+        {
+            if (!TryInvokeLogger("Warn", text)) Console.WriteLine("WARN: " + text);
+        }
+
+        private void LogError(string text)
+        {
+            if (!TryInvokeLogger("Error", text)) Console.WriteLine("ERROR: " + text);
         }
     }
 }
