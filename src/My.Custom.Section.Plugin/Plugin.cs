@@ -1,23 +1,55 @@
 using System;
+using System.Reflection;
 
 namespace My.Custom.Section.Plugin
 {
-    // Minimal entrypoint: expose Start/Stop so we can wire into Jellyfin lifecycle.
-    // This avoids depending on IServerEntryPoint or BasePlugin at compile time.
+    // Reflection-based entry that compiles without Jellyfin types.
+    // It will call PluginBootstrap.RegisterSectionOnStartup() if that type/method exists inside the plugin assembly.
     public class Plugin
     {
-        public Plugin()
-        {
-            // Keep constructor minimal to avoid BasePlugin ctor mismatches
-        }
+        public Plugin() { }
 
-        // Public method named Start so it can be discovered/called in many plugin lifecycles.
         public void Start()
         {
             try
             {
-                var bootstrap = new PluginBootstrap(null);
-                bootstrap.RegisterSectionOnStartup();
+                // Try to find PluginBootstrap in the current assembly first
+                var asm = Assembly.GetExecutingAssembly();
+                var bootstrapType = asm.GetType("My.Custom.Section.Plugin.PluginBootstrap", throwOnError: false);
+
+                // If not found in the same assembly, try to locate it by name from loaded assemblies
+                if (bootstrapType == null)
+                {
+                    foreach (var a in AppDomain.CurrentDomain.GetAssemblies())
+                    {
+                        bootstrapType = a.GetType("My.Custom.Section.Plugin.PluginBootstrap", throwOnError: false);
+                        if (bootstrapType != null) break;
+                    }
+                }
+
+                if (bootstrapType != null)
+                {
+                    // Create instance; if your PluginBootstrap ctor signature differs adjust the args array accordingly
+                    object? instance = null;
+                    var ctor = bootstrapType.GetConstructor(new Type[] { typeof(object) }) ?? bootstrapType.GetConstructor(Type.EmptyTypes);
+                    if (ctor != null)
+                    {
+                        instance = ctor.GetParameters().Length == 1 ? ctor.Invoke(new object?[] { null }) : ctor.Invoke(Array.Empty<object>());
+                    } 
+                    else
+                    {
+                        // fallback to Activator
+                        instance = Activator.CreateInstance(bootstrapType);
+                    }
+
+                    var method = bootstrapType.GetMethod("RegisterSectionOnStartup", BindingFlags.Public | BindingFlags.Instance);
+                    method?.Invoke(instance, null);
+                    Console.WriteLine("My Custom Section Plugin: RegisterSectionOnStartup invoked (reflection).");
+                }
+                else
+                {
+                    Console.WriteLine("My Custom Section Plugin: PluginBootstrap type not found.");
+                }
             }
             catch (Exception ex)
             {
@@ -25,10 +57,9 @@ namespace My.Custom.Section.Plugin
             }
         }
 
-        // Public Stop method for symmetry
         public void Stop()
         {
-            // no-op for now
+            // no-op
         }
     }
 }
