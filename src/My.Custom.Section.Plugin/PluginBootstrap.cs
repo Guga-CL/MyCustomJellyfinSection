@@ -201,10 +201,10 @@ namespace My.Custom.Section.Plugin
                         }
                     }
                 }
-                catch (TargetInvocationException tie)
+                catch (TargetInvocationException)
                 {
                     // bubble to outer catch
-                    throw tie;
+                    throw;
                 }
 
                 // If nothing worked, try invoking by passing JObject.ToString() (fallback)
