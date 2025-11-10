@@ -1,42 +1,34 @@
-using MediaBrowser.Common.Plugins;
-using MediaBrowser.Controller.Plugins;
-using MediaBrowser.Common.Logging;
+using System;
 
 namespace My.Custom.Section.Plugin
 {
-    public class Plugin : BasePlugin, IServerEntryPoint
+    // Minimal entrypoint: expose Start/Stop so we can wire into Jellyfin lifecycle.
+    // This avoids depending on IServerEntryPoint or BasePlugin at compile time.
+    public class Plugin
     {
-        private readonly ILogger _logger;
-
-        // Use the ctor signature that BasePlugin commonly exposes.
-        // If this exact signature errors, remove parameters and use the minimal variant below.
-        public Plugin(IApplicationPaths appPaths, IXmlSerializer xmlSerializer, ILogger logger)
-            : base(appPaths, xmlSerializer)
+        public Plugin()
         {
-            _logger = logger;
+            // Keep constructor minimal to avoid BasePlugin ctor mismatches
         }
 
-        public override string Name => "My Custom Section Plugin";
-        public override string Description => "Registers a custom home section";
-
+        // Public method named Start so it can be discovered/called in many plugin lifecycles.
         public void Start()
         {
-            _logger?.Info($"{Name}: Start called");
             try
             {
-                var bootstrap = new PluginBootstrap(_logger);
+                var bootstrap = new PluginBootstrap(null);
                 bootstrap.RegisterSectionOnStartup();
-                _logger?.Info($"{Name}: RegisterSectionOnStartup finished");
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
-                _logger?.ErrorException($"{Name}: Start error", ex);
+                Console.WriteLine($"My Custom Section Plugin: Start error: {ex}");
             }
         }
 
+        // Public Stop method for symmetry
         public void Stop()
         {
-            _logger?.Info($"{Name}: Stop called");
+            // no-op for now
         }
     }
 }
