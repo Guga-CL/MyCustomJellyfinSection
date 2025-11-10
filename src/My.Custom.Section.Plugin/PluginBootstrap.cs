@@ -51,7 +51,8 @@ namespace My.Custom.Section.Plugin
         public void RegisterSectionOnStartup()
         {
             // Debug wrapper: write entering/exiting and any caught exceptions to a user-writable file
-            var debugPath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "jellyfin_plugin_debug.txt");
+            var debugPath = @"C:\Temp\jellyfin_plugin_debug.txt";
+;
             try
             {
                 try { System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:O} [MyCustomSection] Entering RegisterSectionOnStartup{Environment.NewLine}"); } catch { }

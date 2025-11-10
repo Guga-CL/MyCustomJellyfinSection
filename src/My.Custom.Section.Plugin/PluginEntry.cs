@@ -8,7 +8,7 @@ namespace My.Custom.Section.Plugin
     {
         public PluginEntry()
         {
-            var debugPath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "jellyfin_plugin_debug.txt");
+            var debugPath = @"C:\Temp\jellyfin_plugin_debug.txt";
 
             try { System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:O} [MyCustomSection] PluginEntry constructed{Environment.NewLine}"); } catch { }
 
@@ -32,7 +32,7 @@ namespace My.Custom.Section.Plugin
                     try
                     {
                         try { System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:O} [MyCustomSection] Task started{Environment.NewLine}"); } catch { }
-                        await Task.Delay(1500);
+                        await Task.Delay(4000);
 
                         try { System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:O} [MyCustomSection] Calling RegisterSectionOnStartup{Environment.NewLine}"); } catch { }
 
