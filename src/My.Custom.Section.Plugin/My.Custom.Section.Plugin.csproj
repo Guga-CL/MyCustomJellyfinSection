@@ -1,6 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
-  <PropertyGroup>
+﻿  <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
@@ -13,18 +11,9 @@
     <PackageReference Include="Jellyfin.Model" Version="10.11.2" />
   </ItemGroup>
 
-    <PropertyGroup>
-    <!-- Adjust this path if your Jellyfin server is installed in a different folder -->
-    <JellyfinServerPath>C:\Program Files\Jellyfin\Server</JellyfinServerPath>
-  </PropertyGroup>
-
   <ItemGroup>
-    <!-- Reference the server assembly that exposes the plugin interface -->
-    <Reference Include="Emby.Server.Implementations.Plugins">
+    <Reference Include="Emby.Server.Implementations">
       <HintPath>$(JellyfinServerPath)\Emby.Server.Implementations.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>
-
-
-</Project>
