@@ -1,26 +1,23 @@
-using System.Text.Json;
+using System;
+using Newtonsoft.Json.Linq;
 
 namespace My.Custom.Section.Plugin
 {
     public static class SectionRegistrar
     {
-        public static object BuildPayload(string id, string displayText, string resultsAssembly, string resultsClass, string resultsMethod)
+        public static JObject BuildPayload()
         {
-            var payload = new {
-                id = id,
-                displayText = displayText,
-                limit = 1,
-                route = "",
-                additionalData = "",
-                resultsAssembly = resultsAssembly,
-                resultsClass = resultsClass,
-                resultsMethod = resultsMethod
+            return new JObject
+            {
+                ["id"] = Guid.Parse("11111111-2222-3333-4444-555555555555"),
+                ["displayText"] = "My Custom Section",
+                ["limit"] = 1,
+                ["route"] = "/my-custom-section",
+                ["additionalData"] = "{}",
+                ["resultsAssembly"] = typeof(SectionRegistrar).Assembly.FullName,
+                ["resultsClass"] = "My.Custom.Section.Plugin.ResultsHandler",
+                ["resultsMethod"] = "GetSectionResults"
             };
-
-            // return JsonSerializer.Deserialize<object>(JsonSerializer.Serialize(payload));
-            // instead of the code above test the 2 lines below, to avoid "Possible null reference return.CS8603"
-            var json = JsonSerializer.Serialize(payload);
-            return JsonSerializer.Deserialize<JsonElement>(json);
         }
     }
 }
