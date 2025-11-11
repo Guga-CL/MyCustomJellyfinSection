@@ -1,0 +1,15 @@
+{
+  "category": "",
+  "changelog": "",
+  "description": "Adds a custom Home Screen section",
+  "guid": "bc325047-a3cf-1ed0-8185-9a9820508dbf",
+  "name": "My Custom Section",
+  "overview": "",
+  "owner": "",
+  "targetAbi": "10.11.2.0",
+  "timestamp": "0001-01-01T00:00:00.0000000Z",
+  "version": "1.0.0.0",
+  "status": "Enabled",
+  "autoUpdate": false,
+  "assemblies": [ "My.Custom.Section.Plugin.dll" ]
+}
