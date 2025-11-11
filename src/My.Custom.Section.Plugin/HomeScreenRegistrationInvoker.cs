@@ -11,60 +11,55 @@ namespace My.Custom.Section.Plugin
         {
             try
             {
-                // Look for the HomeScreenSections plugin type that exposes the registration method.
+                // Defensive assembly/type discovery: swallow any failures
                 var assemblies = AppDomain.CurrentDomain.GetAssemblies();
-                var type = assemblies
+                var targetType = assemblies
                     .SelectMany(a =>
                     {
                         try { return a.GetTypes(); }
                         catch { return Array.Empty<Type>(); }
                     })
-                    .FirstOrDefault(t => t.FullName != null && t.FullName.Contains("Jellyfin.Plugin.HomeScreenSections.PluginInterface"));
+                    .FirstOrDefault(t => t.FullName != null && t.FullName.Contains("HomeScreenSections") && t.GetMethods().Any(m => m.Name == "RegisterSection"));
 
-                if (type == null)
+                if (targetType == null)
                 {
-                    Log("HomeScreenRegistrationInvoker: target type not found");
+                    ServerEntry.TryWriteDebug("HomeScreenRegistrationInvoker: target type not found");
                     return;
                 }
 
-                var method = type.GetMethod("RegisterSection", BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance);
+                // Prefer static RegisterSection method; if instance required, create one safely
+                var method = targetType.GetMethod("RegisterSection", BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance);
                 if (method == null)
                 {
-                    Log("HomeScreenRegistrationInvoker: RegisterSection method not found");
+                    ServerEntry.TryWriteDebug("HomeScreenRegistrationInvoker: RegisterSection method not found");
                     return;
                 }
 
-                // If the method is static, invoke with null; otherwise create an instance.
                 object? instance = null;
                 if (!method.IsStatic)
                 {
-                    try { instance = Activator.CreateInstance(type); }
-                    catch { Log("HomeScreenRegistrationInvoker: failed to create instance of target type"); }
+                    try { instance = Activator.CreateInstance(targetType); }
+                    catch (Exception ex)
+                    {
+                        ServerEntry.TryWriteDebug($"HomeScreenRegistrationInvoker: failed to create instance of {targetType.FullName}: {ex.GetType().FullName}: {ex.Message}");
+                        return;
+                    }
                 }
 
-                method.Invoke(instance, new object[] { payload });
-                Log("HomeScreenRegistrationInvoker: invoked RegisterSection successfully");
+                try
+                {
+                    method.Invoke(instance, new object[] { payload });
+                    ServerEntry.TryWriteDebug("HomeScreenRegistrationInvoker: invoked RegisterSection successfully");
+                }
+                catch (Exception ex)
+                {
+                    ServerEntry.TryWriteDebug($"HomeScreenRegistrationInvoker: invoke exception: {ex.GetType().FullName}: {ex.Message}");
+                }
             }
             catch (Exception ex)
             {
-                Log($"HomeScreenRegistrationInvoker exception: {ex.GetType().FullName}: {ex.Message}");
+                ServerEntry.TryWriteDebug($"HomeScreenRegistrationInvoker exception: {ex.GetType().FullName}: {ex.Message}");
             }
-        }
-
-        private static void Log(string s)
-        {
-            try
-            {
-                var logPath = System.IO.Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "jellyfin",
-                    "plugins",
-                    "MyCustomSectionPlugin_1.0.0.0",
-                    "jellyfin_plugin_debug.txt");
-                System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(logPath) ?? ".");
-                System.IO.File.AppendAllText(logPath, $"{DateTime.UtcNow:O} {s}{Environment.NewLine}");
-            }
-            catch { }
         }
     }
 }

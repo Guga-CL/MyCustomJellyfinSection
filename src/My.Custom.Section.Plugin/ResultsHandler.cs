@@ -9,8 +9,8 @@ namespace My.Custom.Section.Plugin
         {
             try
             {
-                var j = new JObject { ["ok"] = true };
-                return j;
+                var result = new JObject { ["ok"] = true };
+                return result;
             }
             catch (Exception ex)
             {
