@@ -1,23 +1,19 @@
-using System;
 using Newtonsoft.Json.Linq;
+using System;
 
 namespace My.Custom.Section.Plugin
 {
     internal static class SectionRegistrar
     {
-        public static JObject BuildPayload()
+        internal static JObject BuildPayload()
         {
-            return new JObject
+            var payload = new JObject
             {
-                ["id"] = Guid.Parse("11111111-2222-3333-4444-555555555555"),
-                ["displayText"] = "My Custom Section",
-                ["limit"] = 1,
-                ["route"] = "/my-custom-section",
-                ["additionalData"] = "{}",
-                ["resultsAssembly"] = typeof(SectionRegistrar).Assembly.FullName,
-                ["resultsClass"] = "My.Custom.Section.Plugin.ResultsHandler",
-                ["resultsMethod"] = "GetSectionResults"
+                ["id"] = Guid.NewGuid().ToString(),
+                ["title"] = "My Custom Section",
+                ["assembly"] = typeof(SectionRegistrar).Assembly.GetName().Name
             };
+            return payload;
         }
     }
 }

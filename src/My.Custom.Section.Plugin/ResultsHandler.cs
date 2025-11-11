@@ -1,34 +1,20 @@
-using System;
 using Newtonsoft.Json.Linq;
+using System;
 
 namespace My.Custom.Section.Plugin
 {
     internal class ResultsHandler
     {
-        public ResultsHandler() { }
-
-        // Return a JObject payload that HomeScreenSections can handle as an alternative to QueryResult<BaseItemDto>.
-        // Keep this minimal and defensive.
-        public object GetSectionResults(object requestModel)
+        public JObject Handle(object? input)
         {
             try
             {
-                // Return an empty result that HomeScreenSections will accept.
-                // You can later return a typed QueryResult<BaseItemDto> if you restore the model reference.
-                var result = new JObject
-                {
-                    ["Items"] = new JArray(),
-                    ["TotalRecordCount"] = 0
-                };
-                return result;
+                var j = new JObject { ["ok"] = true };
+                return j;
             }
-            catch
+            catch (Exception ex)
             {
-                return new JObject
-                {
-                    ["Items"] = new JArray(),
-                    ["TotalRecordCount"] = 0
-                };
+                return new JObject { ["ok"] = false, ["error"] = ex.Message };
             }
         }
     }
