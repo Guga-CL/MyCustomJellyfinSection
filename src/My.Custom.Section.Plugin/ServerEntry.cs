@@ -15,8 +15,8 @@ namespace My.Custom.Section.Plugin
 
         public ServerEntry()
         {
-            // Schedule initialization asynchronously so ctor remains trivial and non-blocking.
-            Task.Run(() => RegisterSectionOnStartup());
+            // schedule the registration so ctor does not throw
+            Task.Run(RegisterSectionOnStartup);
         }
 
         private void RegisterSectionOnStartup()
@@ -24,39 +24,13 @@ namespace My.Custom.Section.Plugin
             try
             {
                 var payload = SectionRegistrar.BuildPayload();
-                var asm = PluginBootstrap.FindHomeScreenSectionsAssembly();
-                if (asm == null)
-                {
-                    TryDebugWrite("FindHomeScreenSectionsAssembly returned null");
-                    return;
-                }
-
-                var pluginInterfaceType = asm.GetType("Jellyfin.Plugin.HomeScreenSections.PluginInterface");
-                if (pluginInterfaceType == null)
-                {
-                    TryDebugWrite("PluginInterface type not found in HomeScreenSections assembly");
-                    return;
-                }
-
-                var registerMethod = pluginInterfaceType.GetMethod("RegisterSection", BindingFlags.Public | BindingFlags.Static);
-                if (registerMethod == null)
-                {
-                    TryDebugWrite("RegisterSection method not found on PluginInterface");
-                    return;
-                }
-
-                // Pass the JObject payload. The HomeScreenSections plugin accepts JObject payloads.
-                registerMethod.Invoke(null, new object[] { payload });
-
+                var payloadJson = payload.ToString(Newtonsoft.Json.Formatting.None);
+                PluginBootstrap.TryRegisterSectionWithPayload(payloadJson);
                 TryDebugWrite("RegisterSection invoked successfully");
-            }
-            catch (TargetInvocationException tie)
-            {
-                TryDebugWrite("TargetInvocationException: " + tie.InnerException?.ToString() ?? tie.ToString());
             }
             catch (Exception ex)
             {
-                TryDebugWrite("Exception in RegisterSectionOnStartup: " + ex.ToString());
+                TryDebugWrite("RegisterSectionOnStartup: " + ex.ToString());
             }
         }
 
@@ -64,8 +38,10 @@ namespace My.Custom.Section.Plugin
         {
             try
             {
-                var path = Path.Combine(Path.GetDirectoryName(typeof(ServerEntry).Assembly.Location) ?? Path.GetTempPath(), "jellyfin_plugin_debug.txt");
-                File.AppendAllText(path, $"{DateTime.UtcNow:O} - {text}\n");
+                var asmPath = Assembly.GetExecutingAssembly().Location;
+                var dir = Path.GetDirectoryName(asmPath) ?? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                var path = Path.Combine(dir, "jellyfin_plugin_debug.txt");
+                File.AppendAllText(path, $"{DateTime.UtcNow:O} {text}{Environment.NewLine}");
             }
             catch { /* ignore */ }
         }
