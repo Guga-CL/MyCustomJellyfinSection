@@ -1,10 +1,12 @@
 using System;
+using System.IO;
+using System.Linq;
 using System.Reflection;
+using System.Text;
 
 namespace My.Custom.Section.Plugin
 {
-    // Reflection-based entry that compiles without Jellyfin types.
-    // It will call PluginBootstrap.RegisterSectionOnStartup() if that type/method exists inside the plugin assembly.
+    // Internal helper invoked optionally by hosting code. Keeps reflection strictly inside Start.
     internal class Plugin
     {
         public Plugin() { }
@@ -13,53 +15,78 @@ namespace My.Custom.Section.Plugin
         {
             try
             {
-                // Try to find PluginBootstrap in the current assembly first
                 var asm = Assembly.GetExecutingAssembly();
                 var bootstrapType = asm.GetType("My.Custom.Section.Plugin.PluginBootstrap", throwOnError: false);
 
-                // If not found in the same assembly, try to locate it by name from loaded assemblies
                 if (bootstrapType == null)
                 {
                     foreach (var a in AppDomain.CurrentDomain.GetAssemblies())
                     {
-                        bootstrapType = a.GetType("My.Custom.Section.Plugin.PluginBootstrap", throwOnError: false);
-                        if (bootstrapType != null) break;
+                        try
+                        {
+                            bootstrapType = a.GetType("My.Custom.Section.Plugin.PluginBootstrap", throwOnError: false);
+                            if (bootstrapType != null) break;
+                        }
+                        catch { /* ignore */ }
                     }
                 }
 
-                if (bootstrapType != null)
+                if (bootstrapType == null)
                 {
-                    // Create instance; if your PluginBootstrap ctor signature differs adjust the args array accordingly
-                    object? instance = null;
+                    Log("Plugin.Start: PluginBootstrap type not found");
+                    return;
+                }
+
+                object? instance = null;
+                try
+                {
                     var ctor = bootstrapType.GetConstructor(new Type[] { typeof(object) }) ?? bootstrapType.GetConstructor(Type.EmptyTypes);
                     if (ctor != null)
                     {
                         instance = ctor.GetParameters().Length == 1 ? ctor.Invoke(new object?[] { null }) : ctor.Invoke(Array.Empty<object>());
-                    } 
+                    }
                     else
                     {
-                        // fallback to Activator
                         instance = Activator.CreateInstance(bootstrapType);
                     }
+                }
+                catch (Exception ex)
+                {
+                    Log($"Plugin.Start: failed to construct PluginBootstrap: {ex.GetType().FullName}: {ex.Message}");
+                    return;
+                }
 
+                try
+                {
                     var method = bootstrapType.GetMethod("RegisterSectionOnStartup", BindingFlags.Public | BindingFlags.Instance);
                     method?.Invoke(instance, null);
-                    Console.WriteLine("My Custom Section Plugin: RegisterSectionOnStartup invoked (reflection).");
+                    Log("Plugin.Start: RegisterSectionOnStartup invoked (reflection).");
                 }
-                else
+                catch (Exception ex)
                 {
-                    Console.WriteLine("My Custom Section Plugin: PluginBootstrap type not found.");
+                    Log($"Plugin.Start: invoking RegisterSectionOnStartup failed: {ex.GetType().FullName}: {ex.Message}");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"My Custom Section Plugin: Start error: {ex}");
+                Log($"Plugin.Start: unexpected error: {ex.GetType().FullName}: {ex.Message}");
             }
         }
 
-        public void Stop()
+        public void Stop() { /* no-op */ }
+
+        private static void Log(string message)
         {
-            // no-op
+            try
+            {
+                var baseDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "jellyfin", "plugins", "MyCustomSectionPlugin_1.0.0.0");
+                Directory.CreateDirectory(baseDir);
+                var p = Path.Combine(baseDir, "jellyfin_plugin_debug.txt");
+                File.AppendAllText(p, $"{DateTime.UtcNow:O} {message}{Environment.NewLine}", Encoding.UTF8);
+            }
+            catch { }
         }
     }
 }
