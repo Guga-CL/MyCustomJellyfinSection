@@ -1,6 +1,6 @@
 ﻿namespace My.Custom.Section.Plugin;
 
-public class Class1
+internal class Class1
 {
 
 }

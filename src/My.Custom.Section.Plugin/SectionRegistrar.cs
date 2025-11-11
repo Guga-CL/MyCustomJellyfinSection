@@ -3,7 +3,7 @@ using Newtonsoft.Json.Linq;
 
 namespace My.Custom.Section.Plugin
 {
-    public static class SectionRegistrar
+    internal static class SectionRegistrar
     {
         public static JObject BuildPayload()
         {

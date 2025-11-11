@@ -9,7 +9,7 @@ using Newtonsoft.Json.Linq;
 namespace My.Custom.Section.Plugin
 {
     // Small, static helper class used by ServerEntry to find the HomeScreenSections plugin and invoke its registration method.
-    public static class PluginBootstrap
+    internal static class PluginBootstrap
     {
         private const string DebugFileName = "jellyfin_plugin_debug.txt";
 

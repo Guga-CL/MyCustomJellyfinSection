@@ -5,7 +5,7 @@ namespace My.Custom.Section.Plugin
 {
     // Reflection-based entry that compiles without Jellyfin types.
     // It will call PluginBootstrap.RegisterSectionOnStartup() if that type/method exists inside the plugin assembly.
-    public class Plugin
+    internal class Plugin
     {
         public Plugin() { }
 

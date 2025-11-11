@@ -3,7 +3,7 @@ using Newtonsoft.Json.Linq;
 
 namespace My.Custom.Section.Plugin
 {
-    public class ResultsHandler
+    internal class ResultsHandler
     {
         public ResultsHandler() { }
 
