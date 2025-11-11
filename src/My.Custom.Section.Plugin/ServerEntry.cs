@@ -2,38 +2,21 @@ using MediaBrowser.Common.Plugins;
 using System;
 using System.IO;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace My.Custom.Section.Plugin
 {
     public class ServerEntry : BasePlugin
     {
-        // Keep these extremely simple and guaranteed not to throw
-        public override string Name => "My Custom Section";
-        public override string Description => "Adds a custom Home Screen section";
+        // Simple literal values only
+        public override string Name => "My Custom Section (Test Minimal)";
+        public override string Description => "Minimal plugin used to test plugin loading.";
 
+        // Parameterless ctor only; do not run any background work here
         public ServerEntry()
         {
-            // Minimal ctor: log and defer all work
-            TryWriteDebug("ServerEntry ctor entered");
-            Task.Run(() => SafeInit());
+            TryWriteDebug("Minimal ServerEntry ctor executed");
         }
 
-        private void SafeInit()
-        {
-            try
-            {
-                TryWriteDebug("SafeInit started");
-                PluginBootstrap.TryRegisterSection();
-                TryWriteDebug("SafeInit finished");
-            }
-            catch (Exception ex)
-            {
-                TryWriteDebug($"SafeInit exception: {ex.GetType().FullName}: {ex.Message}\n{ex.StackTrace}");
-            }
-        }
-
-        // Non-throwing logger used only for diagnostics
         internal static void TryWriteDebug(string text)
         {
             try
@@ -44,8 +27,8 @@ namespace My.Custom.Section.Plugin
                     "plugins",
                     "MyCustomSectionPlugin_1.0.0.0");
                 Directory.CreateDirectory(baseDir);
-                var logPath = Path.Combine(baseDir, "jellyfin_plugin_debug.txt");
-                File.AppendAllText(logPath, $"{DateTime.UtcNow:O} {text}{Environment.NewLine}", Encoding.UTF8);
+                var p = Path.Combine(baseDir, "jellyfin_plugin_debug_minimal.txt");
+                File.AppendAllText(p, $"{DateTime.UtcNow:O} {text}{Environment.NewLine}", Encoding.UTF8);
             }
             catch { /* swallow */ }
         }

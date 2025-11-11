@@ -1,9 +1,9 @@
 {
   "category": "",
   "changelog": "",
-  "description": "Adds a custom Home Screen section",
+  "description": "Minimal test plugin to validate loading",
   "guid": "bc325047-a3cf-1ed0-8185-9a9820508dbf",
-  "name": "My Custom Section",
+  "name": "My Custom Section Minimal Test",
   "overview": "",
   "owner": "",
   "targetAbi": "10.11.2",
