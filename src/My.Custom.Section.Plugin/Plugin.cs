@@ -59,7 +59,8 @@ namespace My.Custom.Section.Plugin
 
                     try
                     {
-                        var method = bootstrapType.GetMethod("RegisterSectionOnStartup", BindingFlags.Public | BindingFlags.Instance);
+                        // Try reflection invocation first (keeps previous behavior)
+                        var method = bootstrapType.GetMethod("RegisterSectionOnStartup", BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static);
                         method?.Invoke(instance, null);
                         Log("Plugin.Start: RegisterSectionOnStartup invoked (reflection).");
                     }
@@ -67,6 +68,25 @@ namespace My.Custom.Section.Plugin
                     {
                         Log($"Plugin.Start: invoking RegisterSectionOnStartup failed: {ex.GetType().FullName}: {ex.Message}");
                     }
+
+                    try
+                    {
+                        // Also call the bootstrap method directly to ensure it's executed in environments
+                        // where reflection instance paths may not be invoked.
+                        // This call is safe because PluginBootstrap.RegisterSectionOnStartup is designed
+                        // to swallow exceptions and write debug info itself.
+                        try
+                        {
+                            PluginBootstrap.RegisterSectionOnStartup();
+                            Log("Plugin.Start: PluginBootstrap.RegisterSectionOnStartup invoked (direct).");
+                        }
+                        catch (Exception ex)
+                        {
+                            // Best-effort local logging in case PluginBootstrap throws
+                            Log($"Plugin.Start: direct PluginBootstrap.RegisterSectionOnStartup threw: {ex.GetType().FullName}: {ex.Message}");
+                        }
+                    }
+                    catch { /* swallow outer */ }
                 }
 
                 // Schedule registration via our safe path after a short delay to ensure dependent plugins/services are up.
