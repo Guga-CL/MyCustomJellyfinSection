@@ -72,6 +72,12 @@ namespace My.Custom.Section.Plugin
         // Call this from the plugin lifecycle hook (OnLoad/OnApplicationStarted) or from CreatePluginInstance consumer when safe.
         public async Task InitializeAsync()
         {
+            _logger.LogInformation("MyCustomSection: InitializeAsync starting");
+            // or for file fallback
+            File.AppendAllText(Path.Combine(Path.GetTempPath(), "MyCustomSection-debug.txt"),
+                $"{DateTime.UtcNow:O} InitializeAsync start{Environment.NewLine}");
+
+
             try
             {
                 // Example: create or obtain the resource lazily and defensively
