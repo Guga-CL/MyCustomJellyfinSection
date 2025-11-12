@@ -31,3 +31,4 @@ Release
 *.zip
 node_modules
 MyCustomJellyfinSection.sln
+My.Custom.Section.Plugin.bak/
