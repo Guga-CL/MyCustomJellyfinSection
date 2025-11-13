@@ -32,3 +32,4 @@ Release
 node_modules
 MyCustomJellyfinSection.sln
 My.Custom.Section.Plugin.bak/
+scripts/build-it/version.txt
