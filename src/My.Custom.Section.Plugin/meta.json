@@ -1,14 +1,7 @@
 {
-  "category": "",
-  "changelog": "",
-  "description": "Minimal test plugin to validate loading",
-  "guid": "bc325047-a3cf-1ed0-8185-9a9820508dbf",
-  "name": "My Custom Section Minimal Test",
-  "overview": "",
-  "owner": "",
-  "targetAbi": "10.11.2",
-  "timestamp": "0001-01-01T00:00:00.0000000Z",
-  "version": "1.0.0.0",
-  "autoUpdate": false,
-  "assemblies": [ "My.Custom.Section.Plugin.dll" ]
+  "name": "My Custom Section",
+  "guid": "9194a4db-c196-44ab-bf6a-b6c54da9414a",
+  "version": "0.0.0.32",
+  "description": "Minimal test plugin to register a Home Screen Section.",
+  "assembly": "My.Custom.Section.Plugin.dll"
 }

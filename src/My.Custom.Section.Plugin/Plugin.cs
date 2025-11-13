@@ -1,143 +1,31 @@
+﻿using MediaBrowser.Common.Configuration;
+using MediaBrowser.Common.Plugins;
+using MediaBrowser.Model.Plugins;
+using MediaBrowser.Model.Serialization;
 using System;
-using System.IO;
-using System.Linq;
-using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
+using System.Collections.Generic;
 
 namespace My.Custom.Section.Plugin
 {
-    // Internal helper invoked optionally by hosting code. Keeps reflection strictly inside Start.
-    internal class Plugin
+    public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     {
-        public Plugin()
-        {
-        }
+        public Plugin(IApplicationPaths applicationPaths, IXmlSerializer xmlSerializer)
+            : base(applicationPaths, xmlSerializer) { }
 
-        public void Start()
+        public override string Name => "My Custom Section";
+        public override string Description => "Minimal test plugin to register a Home Screen Section.";
+        public override Guid Id => Guid.Parse("9194a4db-c196-44ab-bf6a-b6c54da9414a");
+
+        public IEnumerable<PluginPageInfo> GetPages()
         {
-            try
+            return new[]
             {
-                var asm = Assembly.GetExecutingAssembly();
-                var bootstrapType = asm.GetType("My.Custom.Section.Plugin.PluginBootstrap", throwOnError: false);
-                if (bootstrapType == null)
+                new PluginPageInfo
                 {
-                    foreach (var a in AppDomain.CurrentDomain.GetAssemblies())
-                    {
-                        try
-                        {
-                            bootstrapType = a.GetType("My.Custom.Section.Plugin.PluginBootstrap", throwOnError: false);
-                            if (bootstrapType != null) break;
-                        }
-                        catch { /* ignore */ }
-                    }
+                    Name = "MyCustomSection",
+                    EmbeddedResourcePath = "My.Custom.Section.Plugin.Configuration.configPage.html"
                 }
-
-                if (bootstrapType == null)
-                {
-                    Log("Plugin.Start: PluginBootstrap type not found");
-                }
-                else
-                {
-                    object? instance = null;
-                    try
-                    {
-                        var ctor = bootstrapType.GetConstructor(new Type[] { typeof(object) }) ?? bootstrapType.GetConstructor(Type.EmptyTypes);
-                        if (ctor != null)
-                        {
-                            instance = ctor.GetParameters().Length == 1 ? ctor.Invoke(new object?[] { null }) : ctor.Invoke(Array.Empty<object>());
-                        }
-                        else
-                        {
-                            instance = Activator.CreateInstance(bootstrapType);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Log($"Plugin.Start: failed to construct PluginBootstrap: {ex.GetType().FullName}: {ex.Message}");
-                    }
-
-                    try
-                    {
-                        // Try reflection invocation first (keeps previous behavior)
-                        var method = bootstrapType.GetMethod("RegisterSectionOnStartup", BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static);
-                        method?.Invoke(instance, null);
-                        Log("Plugin.Start: RegisterSectionOnStartup invoked (reflection).");
-                    }
-                    catch (Exception ex)
-                    {
-                        Log($"Plugin.Start: invoking RegisterSectionOnStartup failed: {ex.GetType().FullName}: {ex.Message}");
-                    }
-
-                    try
-                    {
-                        // Also call the bootstrap method directly to ensure it's executed in environments
-                        // where reflection instance paths may not be invoked.
-                        // This call is safe because PluginBootstrap.RegisterSectionOnStartup is designed
-                        // to swallow exceptions and write debug info itself.
-                        try
-                        {
-                            PluginBootstrap.RegisterSectionOnStartup();
-                            Log("Plugin.Start: PluginBootstrap.RegisterSectionOnStartup invoked (direct).");
-                        }
-                        catch (Exception ex)
-                        {
-                            // Best-effort local logging in case PluginBootstrap throws
-                            Log($"Plugin.Start: direct PluginBootstrap.RegisterSectionOnStartup threw: {ex.GetType().FullName}: {ex.Message}");
-                        }
-                    }
-                    catch { /* swallow outer */ }
-                }
-
-                // Schedule registration via our safe path after a short delay to ensure dependent plugins/services are up.
-                Task.Run(async () =>
-                {
-                    try
-                    {
-                        await Task.Delay(TimeSpan.FromSeconds(2));
-
-                        try
-                        {
-                            var payload = SectionRegistrar.BuildPayload();
-                            HomeScreenRegistrationInvoker.InvokeRegisterSection(payload);
-                            Log("Plugin.Start: HomeScreen registration invoked via SectionRegistrar/HomeScreenRegistrationInvoker.");
-                        }
-                        catch (Exception ex)
-                        {
-                            Log($"Plugin.Start: HomeScreen registration attempt failed: {ex.GetType().FullName}: {ex.Message}");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Log($"Plugin.Start: background registration task failed: {ex.GetType().FullName}: {ex.Message}");
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                Log($"Plugin.Start: unexpected error: {ex.GetType().FullName}: {ex.Message}");
-            }
-        }
-
-        public void Stop()
-        {
-            /* no-op */
-        }
-
-        private static void Log(string message)
-        {
-            try
-            {
-                var baseDir = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "jellyfin",
-                    "plugins",
-                    "MyCustomSectionPlugin_1.0.0.0");
-                Directory.CreateDirectory(baseDir);
-                var p = Path.Combine(baseDir, "jellyfin_plugin_debug.txt");
-                File.AppendAllText(p, $"{DateTime.UtcNow:O} {message}{Environment.NewLine}", Encoding.UTF8);
-            }
-            catch { }
+            };
         }
     }
 }
