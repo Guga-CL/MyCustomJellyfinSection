@@ -6,7 +6,7 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 
-namespace My.Custom.Section.Plugin
+namespace MyCustomSectionPlugin
 {
     public static class SectionResults
     {

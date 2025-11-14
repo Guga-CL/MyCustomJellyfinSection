@@ -1,6 +1,6 @@
 using MediaBrowser.Model.Plugins;
 
-namespace My.Custom.Section.Plugin
+namespace MyCustomSectionPlugin
 {
     public class PluginConfiguration : BasePluginConfiguration
     {

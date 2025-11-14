@@ -8,14 +8,23 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Loader;
+//using System.Diagnostics; //added for debugging, look for the: Debugger.Break();  can be removed later
 
-namespace My.Custom.Section.Plugin
+namespace MyCustomSectionPlugin
 {
     public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     {
+        // Static constructor: runs once when the class is first loaded
+        static Plugin()
+        {
+            System.Console.WriteLine("[MyCustomSection] Static constructor hit");
+            System.Diagnostics.Debugger.Break();
+        }
         public Plugin(IApplicationPaths applicationPaths, IXmlSerializer xmlSerializer)
             : base(applicationPaths, xmlSerializer)
         {
+            // Force debugger to break here
+            // Debugger.Break();
             RegisterHomeScreenSection();
         }
 
