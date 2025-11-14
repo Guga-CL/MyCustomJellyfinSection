@@ -1,7 +1,7 @@
 {
   "name": "My Custom Section",
-  "guid": "9194a4db-c196-44ab-bf6a-b6c54da9414a",
-  "version": "0.0.0.32",
+  "guid": "aef0c16b-7e00-456c-b4df-0dc38c42e942",
+  "version": "0.0.0.42",
   "description": "Minimal test plugin to register a Home Screen Section.",
   "assembly": "My.Custom.Section.Plugin.dll"
 }
