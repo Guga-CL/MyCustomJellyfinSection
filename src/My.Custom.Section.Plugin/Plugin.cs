@@ -8,7 +8,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Loader;
-//using System.Diagnostics; //added for debugging, look for the: Debugger.Break();  can be removed later
+using System.Diagnostics; //added for debugging, look for the: Debugger.Break();  can be removed later
+using MediaBrowser.Controller.Plugins;
 
 namespace MyCustomSectionPlugin
 {
@@ -25,6 +26,7 @@ namespace MyCustomSectionPlugin
         {
             // Force debugger to break here
             // Debugger.Break();
+            Console.WriteLine("[MyCustomSection] Plugin constructor hit");
             RegisterHomeScreenSection();
         }
 
@@ -32,19 +34,20 @@ namespace MyCustomSectionPlugin
         public override string Description => "Minimal test plugin to register a Home Screen Section.";
         public override Guid Id => Guid.Parse("aef0c16b-7e00-456c-b4df-0dc38c42e942");
 
+
         public IEnumerable<PluginPageInfo> GetPages()
         {
             return new[]
             {
                 new PluginPageInfo
                 {
-                    Name = "MyCustomSection",
-                    EmbeddedResourcePath = "My.Custom.Section.Plugin.Configuration.configPage.html"
+                    Name = "My Custom Section",
+                    EmbeddedResourcePath = "MyCustomSectionPlugin.Configuration.configPage.html"
                 }
             };
         }
 
-        private void RegisterHomeScreenSection()
+        public static void RegisterHomeScreenSection()
         {
             var payload = new JObject
             {
@@ -54,7 +57,7 @@ namespace MyCustomSectionPlugin
                 ["limit"] = 1,
                 ["route"] = "mycustomsection",
                 ["additionalData"] = "extra-info",
-                ["resultsAssembly"] = GetType().Assembly.FullName,
+                ["resultsAssembly"] = typeof(Plugin).Assembly.FullName,
                 ["resultsClass"] = typeof(SectionResults).FullName,
                 ["resultsMethod"] = nameof(SectionResults.GetResults),
 
@@ -83,5 +86,7 @@ namespace MyCustomSectionPlugin
         }
 
 
+
     }
+
 }
