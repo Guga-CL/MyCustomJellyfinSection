@@ -13,18 +13,7 @@ namespace MyCustomJellyfinSection
         // Main entry point: HomeScreenSections will call this
         public static QueryResult<BaseItemDto> GetResults(JObject request)
         {
-            return GetResultsInternal("JObject", request);
-        }
-
-        // Defensive overload in case the host calls with object
-        public static QueryResult<BaseItemDto> GetResults(object request)
-        {
-            return GetResultsInternal("object", request);
-        }
-
-        private static QueryResult<BaseItemDto> GetResultsInternal(string sourceType, object request)
-        {
-            Console.WriteLine($"[MyCustomSection] GetResults START (called as {sourceType}) {DateTime.UtcNow}");
+            Console.WriteLine($"[MyCustomSection] GetResults START {DateTime.UtcNow}");
 
             var items = new List<BaseItemDto>
             {
