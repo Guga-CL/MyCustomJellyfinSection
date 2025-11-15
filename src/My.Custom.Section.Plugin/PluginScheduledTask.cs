@@ -4,28 +4,24 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace MyCustomSectionPlugin
+namespace MyCustomJellyfinSection
 {
     public class StartupTask : IScheduledTask
     {
         public string Key => "MyCustomSectionStartup";
         public string Name => "MyCustomSection Startup Task";
-        public string Description => "Runs once at server startup to test plugin execution.";
+        public string Description => "No-op startup task kept for diagnostics and future work.";
         public string Category => "MyCustomSection";
 
         public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
         {
-            Console.WriteLine("[MyCustomSection] ScheduledTask ExecuteAsync() called at startup");
-
-            Plugin.RegisterHomeScreenSection(); // now static
-
+            // Keep this task harmless. Only log so you can run it manually for tests.
+            Console.WriteLine("[MyCustomSection] StartupTask executed (no-op).");
             await Task.CompletedTask;
         }
 
-
         public IEnumerable<TaskTriggerInfo> GetDefaultTriggers()
         {
-            // Return an empty list: Jellyfin will run this once at startup
             return Array.Empty<TaskTriggerInfo>();
         }
     }

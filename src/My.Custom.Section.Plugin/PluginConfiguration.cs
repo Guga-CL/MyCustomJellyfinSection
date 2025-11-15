@@ -1,6 +1,6 @@
 using MediaBrowser.Model.Plugins;
 
-namespace MyCustomSectionPlugin
+namespace MyCustomJellyfinSection
 {
     public class PluginConfiguration : BasePluginConfiguration
     {
