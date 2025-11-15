@@ -5,15 +5,19 @@ using MediaBrowser.Model.Entities;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace MyCustomJellyfinSection
 {
+    // Ensure discoverability for reflection
     public static class SectionResults
     {
-        // Main entry point: HomeScreenSections will call this
+        // Strong hint to the JIT not to inline / fold this away
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public static QueryResult<BaseItemDto> GetResults(JObject request)
         {
             Console.WriteLine($"[MyCustomSection] GetResults START {DateTime.UtcNow}");
+            Console.WriteLine($"[MyCustomSection] Request type: {(request == null ? "null" : request.GetType().FullName)}");
 
             var items = new List<BaseItemDto>
             {
