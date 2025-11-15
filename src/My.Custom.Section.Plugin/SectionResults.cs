@@ -9,16 +9,38 @@ using System.Runtime.CompilerServices;
 
 namespace MyCustomJellyfinSection
 {
-    // Ensure discoverability for reflection
     public static class SectionResults
     {
-        // Strong hint to the JIT not to inline / fold this away
         [MethodImpl(MethodImplOptions.NoInlining)]
         public static QueryResult<BaseItemDto> GetResults(JObject request)
         {
-            Console.WriteLine($"[MyCustomSection] GetResults START {DateTime.UtcNow}");
-            Console.WriteLine($"[MyCustomSection] Request type: {(request == null ? "null" : request.GetType().FullName)}");
+            Console.WriteLine($"[MyCustomSection] GetResults(JObject) START {DateTime.UtcNow}");
+            return BuildDummyResult();
+        }
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static QueryResult<BaseItemDto> GetResults(object request)
+        {
+            Console.WriteLine($"[MyCustomSection] GetResults(object) START {DateTime.UtcNow}");
+            return BuildDummyResult();
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static QueryResult<BaseItemDto> GetResults(JToken request)
+        {
+            Console.WriteLine($"[MyCustomSection] GetResults(JToken) START {DateTime.UtcNow}");
+            return BuildDummyResult();
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static QueryResult<BaseItemDto> GetResults(Dictionary<string, object> request)
+        {
+            Console.WriteLine($"[MyCustomSection] GetResults(Dictionary) START {DateTime.UtcNow}");
+            return BuildDummyResult();
+        }
+
+        private static QueryResult<BaseItemDto> BuildDummyResult()
+        {
             var items = new List<BaseItemDto>
             {
                 new BaseItemDto
@@ -26,10 +48,13 @@ namespace MyCustomJellyfinSection
                     Id = Guid.NewGuid(),
                     Name = "Hello Jellyfin!",
                     Type = BaseItemKind.Movie,
-                    Overview = "Dummy item from plugin (no images).",
+                    Overview = "Dummy item from plugin (with fake image tag).",
                     ProductionYear = DateTime.UtcNow.Year,
                     PremiereDate = DateTime.UtcNow,
-                    ImageTags = null
+                    ImageTags = new Dictionary<ImageType, string>
+                    {
+                        { ImageType.Primary, Guid.NewGuid().ToString() }
+                    }
                 }
             };
 
