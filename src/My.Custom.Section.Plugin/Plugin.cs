@@ -10,146 +10,74 @@ using Newtonsoft.Json.Linq;
 
 namespace MyCustomJellyfinSection
 {
-    public class Plugin : BasePlugin<PluginConfiguration>
+    public class Plugin : BasePlugin<BasePluginConfiguration>
     {
-        // Use the same GUID from meta.json
         public override Guid Id => new Guid("aef0c16b-7e00-456c-b4df-0dc38c42e942");
-
         public override string Name => "My Custom Jellyfin Section";
         public override string Description => "Adds a custom section to the Jellyfin home screen.";
 
-        public Plugin(IApplicationPaths applicationPaths, IXmlSerializer xmlSerializer)
-            : base(applicationPaths, xmlSerializer)
+public Plugin(IApplicationPaths applicationPaths, IXmlSerializer xmlSerializer)
+    : base(applicationPaths, xmlSerializer)
+{
+    Console.WriteLine("[MyCustomSection] Plugin constructor running...");
+
+    System.Threading.Tasks.Task.Run(async () =>
+    {
+        // Wait for HomeScreenSections to finish its Startup hook
+        await System.Threading.Tasks.Task.Delay(TimeSpan.FromSeconds(5));
+
+        try
         {
-            Console.WriteLine("[MyCustomSection] Plugin constructor running...");
+            var assemblyName = Assembly.GetExecutingAssembly().GetName().Name;
+            var resultsClass = typeof(SectionResults).FullName;
 
-            try
+            var payloadDict = new Dictionary<string, object>
             {
-                // Determine runtime assembly/type values explicitly and log them
-                var assemblyName = Assembly.GetExecutingAssembly().GetName().Name; // expected "MyCustomSectionPlugin"
-                var resultsClass = typeof(SectionResults).FullName; // expected "MyCustomJellyfinSection.SectionResults"
-                Console.WriteLine("[MyCustomSection] Computed assemblyName=" + assemblyName + ", resultsClass=" + resultsClass);
+                // This is the ID the Modular Home settings page uses
+                ["id"] = "mycustomsection",
 
-                var payloadDict = new Dictionary<string, object>
-                {
-                    ["id"] = "aef0c16b-7e00-456c-b4df-0dc38c42e942",
-                    ["displayText"] = "My Custom Section",
-                    ["route"] = "/web/index.html#!/mycustomsection",
-                    ["resultsAssembly"] = assemblyName,
-                    ["resultsClass"] = resultsClass,
-                    ["limit"] = 1
-                };
+                // Title shown in the Home screen UI
+                ["displayText"] = "My Custom Section",
 
-                // Find HomeScreenSections assembly loaded into the AppDomain
-                var hsAssembly = AppDomain.CurrentDomain.GetAssemblies()
-                    .FirstOrDefault(a => a.GetName().Name == "Jellyfin.Plugin.HomeScreenSections");
+                // Reflection entry that points to your results method
+                ["resultsAssembly"] = assemblyName,              // "MyCustomSectionPlugin"
+                ["resultsClass"] = resultsClass,                 // "MyCustomJellyfinSection.SectionResults"
+                ["resultsMethod"] = nameof(SectionResults.GetResults),
 
-                Console.WriteLine("[MyCustomSection] Found HomeScreenSections assembly: " + (hsAssembly?.FullName ?? "<null>"));
+                // Renderer/layout
+                ["type"] = "cards",                              // keep lower-case "cards" (this was visible before)
 
-                var pluginInterfaceType = hsAssembly?.GetType("Jellyfin.Plugin.HomeScreenSections.PluginInterface");
-                Console.WriteLine("[MyCustomSection] PluginInterface type: " + (pluginInterfaceType?.FullName ?? "<null>"));
+                // Optional metadata that can help grouping and ordering
+                ["sectionType"] = "CustomSection",
+                ["category"] = "Custom",
+                ["order"] = 99,
+                ["limit"] = 10,
 
-                var registerMethod = pluginInterfaceType?.GetMethod("RegisterSection", BindingFlags.Public | BindingFlags.Static);
-                Console.WriteLine("[MyCustomSection] RegisterSection method: " + (registerMethod?.ToString() ?? "<null>"));
+                // Make it appear enabled by default for new users (optional)
+                ["enabledByDefault"] = true
+            };
 
-                if (registerMethod != null)
-                {
-                    var paramType = registerMethod.GetParameters().FirstOrDefault()?.ParameterType;
-                    Console.WriteLine("[MyCustomSection] RegisterSection expects parameter: " + (paramType?.FullName ?? "<null>"));
 
-                    if (paramType != null && paramType.FullName == "Newtonsoft.Json.Linq.JObject")
-                    {
-                        try
-                        {
-                            var jPayload = JObject.FromObject(payloadDict);
-                            Console.WriteLine("[MyCustomSection] Registering payload: resultsAssembly=" + assemblyName + ", resultsClass=" + resultsClass);
-                            registerMethod.Invoke(null, new object[] { jPayload });
-                            Console.WriteLine("[MyCustomSection] Section registration invoked with JObject payload.");
-                        }
-                        catch (TargetInvocationException tie)
-                        {
-                            Console.WriteLine("[MyCustomSection] Invocation error with JObject payload: " + (tie.InnerException?.Message ?? tie.Message));
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine("[MyCustomSection] ERROR invoking RegisterSection with JObject payload: " + ex);
-                        }
-                    }
-                    else
-                    {
-                        Console.WriteLine("[MyCustomSection] Unexpected parameter type for RegisterSection: " + (paramType?.FullName ?? "<null>") + ". Skipping invoke.");
-                    }
-                }
-                else
-                {
-                    Console.WriteLine("[MyCustomSection] ERROR: RegisterSection method not found. Aborting registration.");
-                }
+            var hsAssembly = AppDomain.CurrentDomain.GetAssemblies()
+                .FirstOrDefault(a => a.GetName().Name == "Jellyfin.Plugin.HomeScreenSections");
+            var pluginInterfaceType = hsAssembly?.GetType("Jellyfin.Plugin.HomeScreenSections.PluginInterface");
+            var registerMethod = pluginInterfaceType?.GetMethod("RegisterSection", BindingFlags.Public | BindingFlags.Static);
 
-                // DIAGNOSTIC: enumerate the runtime type and any GetResults candidates in our assembly
-                try
-                {
-                    var runtimeAssembly = AppDomain.CurrentDomain.GetAssemblies()
-                        .FirstOrDefault(a => a.GetName().Name == assemblyName);
-
-                    Console.WriteLine("[MyCustomSection] Diagnostic: runtimeAssembly found: " + (runtimeAssembly?.FullName ?? "<null>"));
-
-                    if (runtimeAssembly != null)
-                    {
-                        var t = runtimeAssembly.GetType(resultsClass);
-                        Console.WriteLine("[MyCustomSection] Diagnostic: runtimeType: " + (t?.FullName ?? "<null>"));
-
-                        if (t != null)
-                        {
-                            var methods = t.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic)
-                                           .Where(m => m.Name.IndexOf("GetResults", StringComparison.OrdinalIgnoreCase) >= 0)
-                                           .ToArray();
-
-                            Console.WriteLine("[MyCustomSection] Diagnostic: Found GetResults methods count: " + methods.Length);
-                            foreach (var m in methods)
-                            {
-                                var paramList = string.Join(", ", m.GetParameters().Select(p => p.ParameterType.FullName + " " + p.Name));
-                                Console.WriteLine($"[MyCustomSection] Diagnostic: Method: {m.Name} Return: {m.ReturnType.FullName} Params: {paramList} IsStatic: {m.IsStatic}");
-                            }
-
-                            // Attempt to invoke any found static candidates with a best-effort argument list
-                            var dummyJ = JObject.FromObject(new { test = "ping" });
-                            foreach (var m in methods)
-                            {
-                                try
-                                {
-                                    var parameters = m.GetParameters();
-                                    var args = parameters.Select(p =>
-                                    {
-                                        if (p.ParameterType.FullName == "Newtonsoft.Json.Linq.JObject") return (object)dummyJ;
-                                        if (!p.ParameterType.IsValueType) return null;
-                                        return Activator.CreateInstance(p.ParameterType);
-                                    }).ToArray();
-
-                                    Console.WriteLine("[MyCustomSection] Diagnostic: Invoking method: " + m.ToString());
-                                    var result = m.IsStatic ? m.Invoke(null, args) : m.Invoke(Activator.CreateInstance(t), args);
-                                    Console.WriteLine("[MyCustomSection] Diagnostic: Invoke result type: " + (result?.GetType().FullName ?? "<null>"));
-                                }
-                                catch (TargetInvocationException tie)
-                                {
-                                    Console.WriteLine("[MyCustomSection] Diagnostic: TargetInvocationException invoking method: " + (tie.InnerException?.ToString() ?? tie.ToString()));
-                                }
-                                catch (Exception ex)
-                                {
-                                    Console.WriteLine("[MyCustomSection] Diagnostic: Exception invoking method: " + ex);
-                                }
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine("[MyCustomSection] Diagnostic ERROR enumerating/invoking methods: " + ex);
-                }
+            if (registerMethod != null)
+            {
+                var jPayload = JObject.FromObject(payloadDict);
+                registerMethod.Invoke(null, new object[] { jPayload });
+                Console.WriteLine("[MyCustomSection] Section registered successfully (delayed).");
             }
-            catch (Exception exOuter)
+            else
             {
-                Console.WriteLine("[MyCustomSection] Unexpected error during registration: " + exOuter);
+                Console.WriteLine("[MyCustomSection] ERROR: RegisterSection method not found.");
             }
         }
-    }
+        catch (Exception ex)
+        {
+            Console.WriteLine("[MyCustomSection] ERROR during registration: " + ex);
+        }
+    });
 }
+}}
