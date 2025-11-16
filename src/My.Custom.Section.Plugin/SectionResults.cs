@@ -3,8 +3,6 @@ using MediaBrowser.Model.Dto;
 using Jellyfin.Data.Enums;
 using MediaBrowser.Model.Entities;
 using Newtonsoft.Json.Linq;
-using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
 namespace MyCustomJellyfinSection

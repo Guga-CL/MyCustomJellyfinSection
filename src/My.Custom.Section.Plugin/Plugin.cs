@@ -3,9 +3,6 @@ using MediaBrowser.Model.Plugins;
 using MediaBrowser.Model.Serialization;
 using MediaBrowser.Common.Configuration;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using Newtonsoft.Json.Linq;
 
@@ -53,21 +50,22 @@ namespace MyCustomJellyfinSection
                 {
                     ["Id"] = "myCustomSection",
                     ["DisplayText"] = "My Custom Section",
+                    ["Limit"] = 1,
+                    ["Route"] = "",
+                    // ["Type"] = "cards",
+                    // ["SectionType"] = "CustomSection",
+                    // ["Category"] = "Custom",
+                    // ["Order"] = 99,
+                    // ["EnabledByDefault"] = true,
+                    // ["ViewMode"] = "Portrait",
+                    // ["DisplayTitleText"] = true,
+                    // ["ShowDetailsMenu"] = true,
+                    // ["AllowViewModeChange"] = true,
+                    // ["AllowHideWatched"] = true,
+                    // ["AdditionalData"] = "MyCustomSection"
                     ["ResultsAssembly"] = assemblyName,
                     ["ResultsClass"] = resultsClass,
-                    ["ResultsMethod"] = resultsMethod,
-                    ["Type"] = "cards",
-                    ["SectionType"] = "CustomSection",
-                    ["Category"] = "Custom",
-                    ["Order"] = 99,
-                    ["Limit"] = 10,
-                    ["EnabledByDefault"] = true,
-                    ["ViewMode"] = "Portrait",
-                    ["DisplayTitleText"] = true,
-                    ["ShowDetailsMenu"] = true,
-                    ["AllowViewModeChange"] = true,
-                    ["AllowHideWatched"] = true,
-                    ["AdditionalData"] = "MyCustomSection"
+                    ["ResultsMethod"] = resultsMethod
                 };
 
                 var hsAssembly = AppDomain.CurrentDomain.GetAssemblies()
