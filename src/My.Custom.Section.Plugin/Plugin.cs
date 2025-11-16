@@ -51,17 +51,23 @@ namespace MyCustomJellyfinSection
 
                 var payloadDict = new Dictionary<string, object>
                 {
-                    ["id"] = "myCustomSection", // camelCase id
-                    ["displayText"] = "My Custom Section",
-                    ["resultsAssembly"] = assemblyName,
-                    ["resultsClass"] = resultsClass,
-                    ["resultsMethod"] = resultsMethod,
-                    ["type"] = "cards",
-                    ["sectionType"] = "customSection",
-                    ["category"] = "custom",
-                    ["order"] = 99,
-                    ["limit"] = 10,
-                    ["enabledByDefault"] = true
+                    ["Id"] = "myCustomSection",
+                    ["DisplayText"] = "My Custom Section",
+                    ["ResultsAssembly"] = assemblyName,
+                    ["ResultsClass"] = resultsClass,
+                    ["ResultsMethod"] = resultsMethod,
+                    ["Type"] = "cards",
+                    ["SectionType"] = "CustomSection",
+                    ["Category"] = "Custom",
+                    ["Order"] = 99,
+                    ["Limit"] = 10,
+                    ["EnabledByDefault"] = true,
+                    ["ViewMode"] = "Portrait",
+                    ["DisplayTitleText"] = true,
+                    ["ShowDetailsMenu"] = true,
+                    ["AllowViewModeChange"] = true,
+                    ["AllowHideWatched"] = true,
+                    ["AdditionalData"] = "MyCustomSection"
                 };
 
                 var hsAssembly = AppDomain.CurrentDomain.GetAssemblies()
@@ -86,5 +92,6 @@ namespace MyCustomJellyfinSection
                 _logger.LogError(ex, "[MyCustomSection] ERROR during registration ({Attempt})", attemptLabel);
             }
         }
+
     }
 }

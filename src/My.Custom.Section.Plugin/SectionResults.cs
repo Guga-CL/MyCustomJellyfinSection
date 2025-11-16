@@ -11,6 +11,15 @@ namespace MyCustomJellyfinSection
 {
     public static class SectionResults
     {
+        // Parameterless version — most likely what reflection is binding to
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static QueryResult<BaseItemDto> GetResults()
+        {
+            Console.WriteLine($"[MyCustomSection] GetResults() START {DateTime.UtcNow}");
+            return BuildDummyResult();
+        }
+
+        // Keep other overloads just in case
         [MethodImpl(MethodImplOptions.NoInlining)]
         public static QueryResult<BaseItemDto> GetResults(JObject request)
         {
